@@ -86,7 +86,7 @@ warn() {
 
 # ===== CONFIGURATION =====
 # Fork-specific settings
-FORK_OWNER="${FORK_OWNER:-clearclown}"  # Replace with your username clearclown
+FORK_OWNER="${FORK_OWNER:-YOUR_GITHUB_USERNAME}"  # Replace with your username
 FORK_REPO="${FORK_REPO:-auto-commit}"
 REPO_URL="https://github.com/${FORK_OWNER}/${FORK_REPO}.git"
 BINARY_NAME="auto-commit"
@@ -100,11 +100,11 @@ TEMP_DIR=""
 # ===== SYSTEM DETECTION =====
 detect_system() {
     log_section "System Detection"
-
+    
     # OS Detection
     OS="$(uname -s)"
     debug_var "OS"
-
+    
     case "$OS" in
         Linux*)     OS_TYPE="Linux";;
         Darwin*)    OS_TYPE="macOS";;
@@ -114,22 +114,22 @@ detect_system() {
     esac
     info "Operating System: $OS_TYPE"
     debug_var "OS_TYPE"
-
+    
     # Architecture Detection
     ARCH="$(uname -m)"
     debug_var "ARCH"
     info "Architecture: $ARCH"
-
+    
     # Shell Detection
     SHELL_TYPE="$(basename "$SHELL")"
     debug_var "SHELL_TYPE"
     info "Shell: $SHELL_TYPE"
-
+    
     # Package Manager Detection
     if command -v apt-get &> /dev/null; then
         PKG_MANAGER="apt"
     elif command -v yum &> /dev/null; then
-        PKG_MANAGER="yum"
+        PKG_MANAGER="yum"  
     elif command -v brew &> /dev/null; then
         PKG_MANAGER="brew"
     elif command -v pacman &> /dev/null; then
@@ -144,9 +144,9 @@ detect_system() {
 # ===== PREREQUISITE CHECKS =====
 check_prerequisites() {
     log_section "Prerequisites Check"
-
+    
     local missing_deps=()
-
+    
     # Check Git
     verbose "Checking for git..."
     if ! command -v git &> /dev/null; then
@@ -156,7 +156,7 @@ check_prerequisites() {
         success "Git $(git --version | awk '{print $3}')"
         debug "Git path: $(which git)"
     fi
-
+    
     # Check Curl
     verbose "Checking for curl..."
     if ! command -v curl &> /dev/null; then
@@ -166,7 +166,7 @@ check_prerequisites() {
         success "Curl $(curl --version | head -1 | awk '{print $2}')"
         debug "Curl path: $(which curl)"
     fi
-
+    
     # Check Rust/Cargo
     verbose "Checking for Rust/Cargo..."
     if ! command -v cargo &> /dev/null; then
@@ -178,14 +178,14 @@ check_prerequisites() {
         debug "Rust toolchain: $(rustc --version)"
         INSTALL_RUST=0
     fi
-
+    
     # Install missing dependencies
     if [ ${#missing_deps[@]} -gt 0 ]; then
         warn "Missing dependencies: ${missing_deps[*]}"
-
+        
         if [[ "$PKG_MANAGER" != "unknown" ]]; then
             info "Installing missing dependencies..."
-
+            
             case "$PKG_MANAGER" in
                 apt)
                     debug_cmd "sudo apt-get update"
@@ -205,7 +205,7 @@ check_prerequisites() {
             err "Please install missing dependencies manually: ${missing_deps[*]}"
         fi
     fi
-
+    
     # Install Rust if needed
     if [[ "$INSTALL_RUST" == "1" ]]; then
         info "Installing Rust..."
@@ -213,10 +213,10 @@ check_prerequisites() {
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > /tmp/rustup.sh
         debug "Running rustup installer..."
         sh /tmp/rustup.sh -y
-
+        
         # Source cargo env
         source "$HOME/.cargo/env"
-
+        
         if ! command -v cargo &> /dev/null; then
             err "Failed to install Rust"
         fi
@@ -227,17 +227,17 @@ check_prerequisites() {
 # ===== REPOSITORY SETUP =====
 setup_repository() {
     log_section "Repository Setup"
-
+    
     # Create temp directory
     TEMP_DIR=$(mktemp -d)
     debug_var "TEMP_DIR"
-
+    
     # Set trap for cleanup
     trap cleanup EXIT
-
+    
     info "Cloning repository from $REPO_URL"
     debug "Clone destination: $TEMP_DIR/$BINARY_NAME"
-
+    
     if ! git clone "$REPO_URL" "$TEMP_DIR/$BINARY_NAME" 2>&1 | while read -r line; do
         verbose "$line"
     done; then
@@ -245,14 +245,14 @@ setup_repository() {
         warn "Failed to clone fork, trying original repository..."
         REPO_URL="https://github.com/m1guelpf/auto-commit.git"
         debug_var "REPO_URL"
-
+        
         if ! git clone "$REPO_URL" "$TEMP_DIR/$BINARY_NAME"; then
             err "Failed to clone repository"
         fi
     fi
-
+    
     success "Repository cloned"
-
+    
     cd "$TEMP_DIR/$BINARY_NAME"
     debug "Current directory: $(pwd)"
     debug "Repository contents:"
@@ -264,25 +264,25 @@ setup_repository() {
 # ===== BUILD PROJECT =====
 build_project() {
     log_section "Building Project"
-
+    
     info "Running cargo build --release"
     verbose "This may take a few minutes..."
-
+    
     # Set RUST_BACKTRACE for debugging
     export RUST_BACKTRACE=1
     debug_var "RUST_BACKTRACE"
-
+    
     # Build with verbose output if debug mode
     if [[ "$DEBUG_MODE" == "1" ]]; then
         cargo build --release --verbose 2>&1 | tee -a "$DEBUG_LOG"
     else
         cargo build --release
     fi
-
+    
     if [ ! -f "target/release/$BINARY_NAME" ]; then
         err "Build failed: binary not found"
     fi
-
+    
     success "Build completed successfully"
     debug "Binary location: $(pwd)/target/release/$BINARY_NAME"
     debug "Binary size: $(du -h target/release/$BINARY_NAME | cut -f1)"
@@ -291,21 +291,21 @@ build_project() {
 # ===== INSTALL BINARY =====
 install_binary() {
     log_section "Installing Binary"
-
+    
     # Create directories
     mkdir -p "$BIN_DIR"
     mkdir -p "$CONFIG_DIR"
-
+    
     debug_var "BIN_DIR"
     debug_var "CONFIG_DIR"
-
+    
     # Copy binary
     info "Installing binary to $BIN_DIR"
     cp "target/release/$BINARY_NAME" "$BIN_DIR/"
     chmod +x "$BIN_DIR/$BINARY_NAME"
-
+    
     success "Binary installed"
-
+    
     # Verify installation
     if "$BIN_DIR/$BINARY_NAME" --version &> /dev/null; then
         local version=$("$BIN_DIR/$BINARY_NAME" --version)
@@ -318,7 +318,7 @@ install_binary() {
 # ===== ENVIRONMENT SETUP =====
 setup_environment() {
     log_section "Environment Setup"
-
+    
     # Create .env file template
     info "Creating .env template"
     cat > "$CONFIG_DIR/.env.example" << 'EOF'
@@ -329,21 +329,21 @@ export DEEPSEEK_API_KEY='sk-your-deepseek-api-key-here'
 # export AUTO_COMMIT_FORMAT='{prefix}: {emoji} {title}'
 # export AUTO_COMMIT_TIMEOUT=30
 EOF
-
+    
     debug "Created $CONFIG_DIR/.env.example"
-
+    
     # Check for existing .env
     if [ -f "$HOME/.env" ] && grep -q "DEEPSEEK_API_KEY" "$HOME/.env"; then
         info "Found existing .env with DEEPSEEK_API_KEY"
     elif [ -f "src/.env" ] && grep -q "DEEPSEEK_API_KEY" "src/.env"; then
-        info "Found src/.env with DEEPSEEK_API_KEY"
+        info "Found src/.env with DEEPSEEK_API_KEY" 
         cp "src/.env" "$CONFIG_DIR/.env"
         success "Copied existing configuration"
     else
         warn "No DEEPSEEK_API_KEY found in environment"
         info "Please set up your API key in $CONFIG_DIR/.env"
     fi
-
+    
     # Setup shell integration
     setup_shell_integration
 }
@@ -351,10 +351,10 @@ EOF
 # ===== SHELL INTEGRATION =====
 setup_shell_integration() {
     log_section "Shell Integration"
-
+    
     local shell_config=""
     local shell_type="$(basename "$SHELL")"
-
+    
     case "$shell_type" in
         bash)
             shell_config="$HOME/.bashrc"
@@ -370,9 +370,9 @@ setup_shell_integration() {
             return
             ;;
     esac
-
+    
     debug_var "shell_config"
-
+    
     # Add to PATH
     if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
         info "Adding $BIN_DIR to PATH"
@@ -383,14 +383,14 @@ setup_shell_integration() {
     else
         info "$BIN_DIR already in PATH"
     fi
-
+    
     # Add auto-completion (if available)
     if [ -f "completions/$BINARY_NAME.bash" ] && [ "$shell_type" = "bash" ]; then
         cp "completions/$BINARY_NAME.bash" "$CONFIG_DIR/"
         echo "source $CONFIG_DIR/$BINARY_NAME.bash" >> "$shell_config"
         success "Bash completion installed"
     fi
-
+    
     # Add convenience alias
     echo "alias ac='$BINARY_NAME'" >> "$shell_config"
     success "Added 'ac' alias for $BINARY_NAME"
@@ -407,7 +407,7 @@ cleanup() {
 # ===== POST INSTALL =====
 post_install() {
     log_section "Post Installation"
-
+    
     echo
     echo -e "${GREEN}🎉 Installation Complete!${NC}"
     echo
@@ -426,7 +426,7 @@ post_install() {
     echo "   git add ."
     echo "   $BINARY_NAME"
     echo
-
+    
     if [[ "$DEBUG_MODE" == "1" ]]; then
         echo -e "${GRAY}Debug log saved to: $DEBUG_LOG${NC}"
     fi
@@ -449,11 +449,11 @@ main() {
     echo "║              Advanced Installer v2.0                   ║"
     echo "╚═══════════════════════════════════════════════════════╝"
     echo -e "${NC}"
-
+    
     if [[ "$DEBUG_MODE" == "1" ]]; then
         echo -e "${GRAY}Debug mode enabled. Log: $DEBUG_LOG${NC}"
     fi
-
+    
     # Run installation steps
     detect_system
     check_prerequisites
@@ -496,6 +496,6 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
                 ;;
         esac
     done
-
+    
     main "$@"
 fi
