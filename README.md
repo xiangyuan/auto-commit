@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
-🌐 **他の言語で読む**: [English](docs/README.en.md) | [简体中文](docs/README.zh-CN.md) | [Русский](docs/README.ru.md) | [العربية](docs/README.ar.md) | [فارسی](docs/README.fa.md)
+🌐 **Languages**: [English](docs/README.en.md) | [简体中文](docs/README.zh-CN.md) | [Русский](docs/README.ru.md) | [العربية](docs/README.ar.md) | [فارسی](docs/README.fa.md)
 
 ## 概要
 
