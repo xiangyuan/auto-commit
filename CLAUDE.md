@@ -51,30 +51,31 @@ For maximum efficiency, whenever you need to perform multiple independent operat
 
 ## Project Overview
 
-`auto-commit-改` is a forked and enhanced version of the original `auto-commit` CLI tool. This project replaces OpenAI with DeepSeek API for commit message generation and adds customizable message formatting capabilities.
+`auto-commit-改` is a fork of the original `auto-commit` CLI tool that replaces OpenAI with DeepSeek API and adds customizable commit message formatting. The project has been successfully refactored from a monolithic design into a modular architecture.
 
-### Project Goals (from 企画書)
-- Replace OpenAI dependency with DeepSeek API for better coding-focused LLM performance
-- Add flexible commit message format customization
-- Refactor `main.rs` to improve maintainability and code quality
-- Maintain compatibility with existing installation methods and build processes
-
-## Key Architecture
-
-- **Single-file application**: Currently all logic in `src/main.rs` (planned refactoring into modules)
-- **Async runtime**: Uses Tokio for async operations
-- **LLM Integration**: Migrating from `async-openai` to DeepSeek API using `reqwest`
-- **CLI interface**: Built with Clap for command-line argument parsing
-
-## Common Commands
+## Commands
 
 ### Development
 ```bash
 # Build the project
 cargo build
 
-# Run in development
-cargo run
+# Run tests
+cargo test
+
+# Run a specific test
+cargo test test_name
+
+# Run tests for a specific module
+cargo test api::
+cargo test git::
+cargo test config::
+
+# Format code
+cargo fmt
+
+# Run linter
+cargo clippy
 
 # Build release binary
 cargo build --release
@@ -83,78 +84,124 @@ cargo build --release
 cargo run -- --dry-run
 cargo run -- --review
 cargo run -- --force
+cargo run -- --format "{emoji} {prefix}: {title}"
 ```
 
-### Installation
+### Testing
 ```bash
-# Install via curl script
-curl -fsSL https://raw.githubusercontent.com/m1guelpf/auto-commit/main/install.sh | sh -
+# Run all tests (some tests need to run serially)
+cargo test -- --test-threads=1
 
-# Or for Arch Linux users
-yay -S auto-commit
+# Run with output for debugging
+cargo test -- --nocapture
+
+# Run integration tests
+cargo test --test '*'
 ```
+
+## High-Level Architecture
+
+The codebase has been refactored from a monolithic `main.rs` into modular components:
+
+```
+src/
+├── main.rs         # Entry point - orchestrates all modules
+├── lib.rs          # Module exports
+├── api/            # DeepSeek API integration
+│   └── mod.rs      # HTTP client, message generation
+├── cli/            # Command-line interface
+│   └── mod.rs      # Clap-based argument parsing
+├── config/         # Configuration management
+│   └── mod.rs      # Environment variables, .env files
+├── formatter/      # Commit message formatting
+│   └── mod.rs      # Template engine with placeholders
+└── git/            # Git operations
+    └── mod.rs      # Staging, diff, commit operations
+```
+
+### Key Design Decisions
+
+1. **Async Runtime**: Uses Tokio for async operations, particularly for API calls
+2. **Error Handling**: Uses `anyhow` for application errors and `thiserror` for library errors
+3. **Testing Strategy**:
+   - Uses `mockito` for HTTP mocking
+   - Uses `tempfile` for Git repository testing
+   - Uses `serial_test` to prevent test conflicts
+4. **API Integration**: Direct HTTP calls with `reqwest` instead of SDK dependencies
 
 ## Environment Setup
 
-The tool requires a DeepSeek API key:
 ```bash
+# Required for operation
 export DEEPSEEK_API_KEY='sk-XXXXXXXX'
+
+# Optional: Create .env file in project root
+echo 'DEEPSEEK_API_KEY=sk-XXXXXXXX' > .env
 ```
 
-## Important Notes
+## Important Implementation Notes
 
-- No test suite exists - TDD approach should be followed for new features
-- The project follows library conventions (no Cargo.lock committed)
-- Multi-platform support: Linux (x86_64, ARM), macOS (Intel, ARM), Windows
-- GitHub Actions handles automated releases via `.github/workflows/release.yml`
-- The tool requires staged Git changes to generate commit messages
+1. **No Hardcoded Values**: All configuration through environment variables
+2. **Git Operations**: Requires staged changes (`git add`) before running
+3. **Test Isolation**: Git tests use temporary repositories to avoid conflicts
+4. **Format Placeholders**: `{title}`, `{description}`, `{emoji}`, `{prefix}`, `{scope}`
 
-## Functional Requirements (from 要件定義書)
+## Development Workflow
 
-### FR001: DeepSeek API Integration
-- Replace OpenAI API with DeepSeek API for commit message generation
-- Read `DEEPSEEK_API_KEY` environment variable instead of `OPENAI_API_KEY`
-- Send staged diff (`git diff --staged`) to DeepSeek API endpoint
-- Parse API response and format as commit message
+1. **Implementation Logs**: After completing features, document in `_docs/yyyy-mm-dd_feature.md`
+2. **Commit Convention**: Follow conventional commits (feat, fix, test, refactor, docs)
+3. **TDD Approach**: Write failing test → implement → refactor
 
-### FR002: Custom Commit Message Format
-- Add `--format` CLI argument to specify custom message templates
-- Support placeholders like `{title}` and `{description}` in format strings
-- Apply default format (`タイトル\n\n説明`) when not specified
-- Allow project-specific commit conventions
+## CI/CD Pipeline
 
-### FR003: Maintain Existing Features
-- Keep `--dry-run` flag for output without committing
-- Keep `--review` flag for editing messages before commit
-- Keep `--force` flag to skip confirmation prompts
+GitHub Actions automates the release process:
+- Triggers on release creation
+- Builds for multiple platforms: Windows, Linux (x86_64), macOS (x86_64, ARM)
+- Creates `.deb` packages for Linux
+- Publishes to AUR (Arch User Repository)
+- Artifacts are uploaded to GitHub releases
 
-## Non-Functional Requirements
+## Installation Methods
 
-### Performance
-- Target response time: < 10 seconds (including API call)
+```bash
+# Via install script (builds from source)
+curl -fsSL https://raw.githubusercontent.com/m1guelpf/auto-commit/main/install.sh | sh -
 
-### Code Quality
-- Follow Rust formatting standards (`cargo fmt`)
-- Modularize `main.rs` into separate concerns (API, Git operations, CLI parsing)
-- Use `cargo clippy` for linting in CI
+# For Arch Linux
+yay -S auto-commit
 
-### Development Process
-- Follow TDD methodology (Red-Green-Refactor cycle)
-- Commit frequently with conventional commit messages
-- Update implementation logs in `_docs/` directory
+# Manual build
+git clone https://github.com/yourusername/auto-commit.git
+cd auto-commit
+cargo build --release
+sudo mv target/release/auto-commit /usr/local/bin/
+```
 
-## Project Phases
+## Specific Project Requirements
 
-### Phase 1: Foundation & API Integration (1 week)
-- Refactor `main.rs` to separate Git operations and CLI parsing
-- Implement DeepSeek API client
-- Create working prototype
+### From Requirements Documents
 
-### Phase 2: Feature Implementation (1 week)
-- Add custom format functionality
-- Integrate with existing CLI options
+1. **DeepSeek API Integration** (FR001)
+   - Replace `OPENAI_API_KEY` with `DEEPSEEK_API_KEY`
+   - API endpoint: `https://api.deepseek.com/v1/chat/completions`
+   - Model: `deepseek-chat`
 
-### Phase 3: Testing & Release (3 days)
-- Cross-platform testing
-- Update documentation
-- Release v1.0.0
+2. **Custom Format Support** (FR002)
+   - `--format` CLI argument for custom templates
+   - Default format: `{title}\n\n{description}`
+   - Support placeholders in format strings
+
+3. **Maintain Compatibility** (FR003)
+   - Keep all existing CLI flags functional
+   - Preserve installation methods
+   - Don't break GitHub Actions workflows
+
+### Performance Requirements
+- Response time target: < 10 seconds (including API call)
+- Use connection pooling for HTTP client
+
+### Code Quality Standards
+- Run `cargo fmt` before commits
+- Run `cargo clippy` and fix warnings
+- Keep functions under 50 lines
+- Keep files under 100 lines when possible
