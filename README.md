@@ -35,7 +35,7 @@ brew install auto-commit
 ### Cargo (Rust)
 
 ```bash
-# crates.io から（公開後）
+# crates.io から
 cargo install auto-commit
 
 # GitHubリポジトリから直接
