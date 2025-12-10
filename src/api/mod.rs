@@ -31,6 +31,22 @@ pub struct DeepSeekClient {
     client: reqwest::Client,
 }
 
+const DEFAULT_PROMPT_TEMPLATE: &str = r#"以下のGit diffを分析して、適切なコミットメッセージを生成してください。
+
+コミットメッセージは以下のフォーマットで生成してください：
+1行目: コミットタイトル（50文字以内、prefix: を含む）
+2行目: 空行
+3行目以降: 詳細説明（必要に応じて）
+
+使用可能なprefix:
+- feat: 新機能
+- fix: バグ修正
+- docs: ドキュメント
+- style: フォーマット
+- refactor: リファクタリング
+- test: テスト
+- chore: ビルド/CI"#;
+
 impl DeepSeekClient {
     pub fn new(api_key: String) -> Self {
         Self {
@@ -40,24 +56,29 @@ impl DeepSeekClient {
         }
     }
 
-    pub async fn generate_commit_message(&self, diff: &str) -> Result<(String, String)> {
-        let prompt = format!(
-            "以下のGit diffを分析して、適切なコミットメッセージを生成してください。\n\
-            コミットメッセージは以下のフォーマットで生成してください：\n\
-            1行目: コミットタイトル（50文字以内、prefix: を含む）\n\
-            2行目: 空行\n\
-            3行目以降: 詳細説明（必要に応じて）\n\n\
-            使用可能なprefix:\n\
-            - feat: 新機能\n\
-            - fix: バグ修正\n\
-            - docs: ドキュメント\n\
-            - style: フォーマット\n\
-            - refactor: リファクタリング\n\
-            - test: テスト\n\
-            - chore: ビルド/CI\n\n\
-            diff:\n{}", 
-            diff
-        );
+    fn build_prompt(&self, diff: &str, template: Option<&str>) -> String {
+        let rules = template.unwrap_or(DEFAULT_PROMPT_TEMPLATE);
+
+        format!(
+            "以下のGit diffを分析して、適切なコミットメッセージを生成してください。\n\n\
+            ## コミットメッセージのルール\n\
+            {}\n\n\
+            ## 重要な指示\n\
+            - コミットメッセージのみを出力してください（説明や補足は不要）\n\
+            - 1行目はタイトル、空行を挟んで本文を記述\n\
+            - prefixとemojiを適切に選択してください\n\n\
+            ## Git diff\n\
+            ```\n{}\n```",
+            rules, diff
+        )
+    }
+
+    pub async fn generate_commit_message(
+        &self,
+        diff: &str,
+        template: Option<&str>,
+    ) -> Result<(String, String)> {
+        let prompt = self.build_prompt(diff, template);
 
         let request = DeepSeekRequest {
             model: "deepseek-chat".to_string(),
@@ -142,7 +163,7 @@ mod tests {
         let diff = "diff --git a/src/auth.rs b/src/auth.rs\n+pub fn login() {}";
 
         // Act
-        let (title, description) = client.generate_commit_message(diff).await.unwrap();
+        let (title, description) = client.generate_commit_message(diff, None).await.unwrap();
 
         // Assert
         assert_eq!(title, "feat: Add user authentication");
@@ -169,7 +190,7 @@ mod tests {
         let diff = "some diff";
 
         // Act
-        let result = client.generate_commit_message(diff).await;
+        let result = client.generate_commit_message(diff, None).await;
 
         // Assert
         assert!(result.is_err());
