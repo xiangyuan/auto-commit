@@ -1,14 +1,15 @@
 [package]
 license = "MIT"
 edition = "2021"
-version = "0.1.4"
+version = "2.0.0"
 name = "auto-commit"
 readme = "README.md"
-categories = ["command-line-utilities"]
-homepage = "https://github.com/m1guelpf/auto-commit"
-repository = "https://github.com/m1guelpf/auto-commit"
-description = "Automagically generate commit messages."
-authors = ["Miguel Piedrafita <soy@miguelpiedrafita.com>"]
+categories = ["command-line-utilities", "development-tools"]
+keywords = ["git", "commit", "ai", "openai", "llm"]
+homepage = "https://github.com/clearclown/auto-commit"
+repository = "https://github.com/clearclown/auto-commit"
+description = "AI-powered Git commit message generator - supports OpenAI, DeepSeek, and Gemini"
+authors = ["clearclown", "Miguel Piedrafita <soy@miguelpiedrafita.com>"]
 
 [dependencies]
 rand = "0.8.5"
