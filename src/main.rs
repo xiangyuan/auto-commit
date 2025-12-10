@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use auto_commit::{
-    api::DeepSeekClient,
+    api::create_client_for_provider,
     cli::Cli,
     config::Config,
     formatter::{CommitData, CommitFormatter},
@@ -39,15 +39,19 @@ async fn main() -> Result<()> {
     }
 
     // Generate commit message
-    let mut spinner = Spinner::new(Spinners::Dots, "Generating commit message...".into());
+    let provider_name = config.provider.to_string();
+    let mut spinner = Spinner::new(
+        Spinners::Dots,
+        format!("Generating commit message using {}...", provider_name),
+    );
 
-    let client = DeepSeekClient::new(config.deepseek_api_key.clone());
+    let client = create_client_for_provider(config.provider, config.api_key.clone());
     let (title, description) = client
         .generate_commit_message(&diff, Some(&config.gitmessage_template))
         .await
         .context("Failed to generate commit message")?;
 
-    spinner.stop_with_message("✓ Commit message generated".into());
+    spinner.stop_with_message(format!("✓ Commit message generated ({})", provider_name));
 
     // Parse commit data
     let raw_message = format!("{}\n\n{}", title, description);
