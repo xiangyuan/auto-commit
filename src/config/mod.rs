@@ -1,12 +1,15 @@
 use anyhow::{Context, Result};
-use std::{env, fs, path::Path};
+use std::{fs, path::Path};
+
+use crate::api::Provider;
 
 /// Default .gitmessage template embedded at compile time
 const DEFAULT_GITMESSAGE_TEMPLATE: &str = include_str!("../../docs/.gitmessage");
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub deepseek_api_key: String,
+    pub provider: Provider,
+    pub api_key: String,
     pub gitmessage_template: String,
 }
 
@@ -34,19 +37,30 @@ pub fn load_gitmessage_template() -> String {
 }
 
 impl Config {
+    /// Load config from environment variables
+    /// Detects provider automatically based on which API key is set
+    /// Priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > GEMINI_API_KEY
     pub fn from_env() -> Result<Self> {
-        let deepseek_api_key = env::var("DEEPSEEK_API_KEY")
-            .context("DEEPSEEK_API_KEY environment variable not found")?;
+        let (provider, api_key) = Provider::detect()
+            .context("No API key found. Set OPENAI_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY")?;
+
         let gitmessage_template = load_gitmessage_template();
 
-        Ok(Self { deepseek_api_key, gitmessage_template })
+        Ok(Self {
+            provider,
+            api_key,
+            gitmessage_template,
+        })
     }
 
+    /// Load config from .env file
+    /// Supports multiple API keys with same priority as from_env()
     pub fn from_env_file(path: &Path) -> Result<Self> {
-        let content = fs::read_to_string(path)
-            .context("Failed to read .env file")?;
+        let content = fs::read_to_string(path).context("Failed to read .env file")?;
 
-        let mut api_key = None;
+        let mut openai_key = None;
+        let mut deepseek_key = None;
+        let mut gemini_key = None;
 
         for line in content.lines() {
             let line = line.trim();
@@ -54,78 +68,185 @@ impl Config {
                 continue;
             }
 
-            if let Some(key_value) = line.strip_prefix("DEEPSEEK_API_KEY=") {
-                api_key = Some(key_value.trim_matches('\'').trim_matches('"').to_string());
-            } else if let Some(key_value) = line.strip_prefix("export DEEPSEEK_API_KEY=") {
-                api_key = Some(key_value.trim_matches('\'').trim_matches('"').to_string());
+            // Handle both regular and export prefixed
+            let line = line.strip_prefix("export ").unwrap_or(line);
+
+            if let Some(value) = extract_env_value(line, "OPENAI_API_KEY=") {
+                openai_key = Some(value);
+            } else if let Some(value) = extract_env_value(line, "DEEPSEEK_API_KEY=") {
+                deepseek_key = Some(value);
+            } else if let Some(value) = extract_env_value(line, "GEMINI_API_KEY=") {
+                gemini_key = Some(value);
             }
         }
 
-        let deepseek_api_key = api_key.context("DEEPSEEK_API_KEY not found in .env file")?;
+        // Priority: OpenAI > DeepSeek > Gemini
+        let (provider, api_key) = if let Some(key) = openai_key {
+            (Provider::OpenAi, key)
+        } else if let Some(key) = deepseek_key {
+            (Provider::DeepSeek, key)
+        } else if let Some(key) = gemini_key {
+            (Provider::Gemini, key)
+        } else {
+            anyhow::bail!(
+                "No API key found in .env file. Set OPENAI_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY"
+            );
+        };
+
         let gitmessage_template = load_gitmessage_template();
 
-        Ok(Self { deepseek_api_key, gitmessage_template })
+        Ok(Self {
+            provider,
+            api_key,
+            gitmessage_template,
+        })
     }
+}
+
+fn extract_env_value(line: &str, prefix: &str) -> Option<String> {
+    line.strip_prefix(prefix)
+        .map(|v| v.trim_matches('\'').trim_matches('"').to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::env;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
-    #[test]
-    fn test_config_from_env() {
-        // Arrange
-        env::set_var("DEEPSEEK_API_KEY", "test-key-123");
-
-        // Act
-        let config = Config::from_env().unwrap();
-
-        // Assert
-        assert_eq!(config.deepseek_api_key, "test-key-123");
-
-        // Cleanup
+    fn clear_env_keys() {
+        env::remove_var("OPENAI_API_KEY");
         env::remove_var("DEEPSEEK_API_KEY");
+        env::remove_var("GEMINI_API_KEY");
     }
 
     #[test]
-    fn test_config_from_env_missing_key() {
-        // Arrange
-        env::remove_var("DEEPSEEK_API_KEY");
+    #[serial]
+    fn test_config_from_env_openai() {
+        clear_env_keys();
+        env::set_var("OPENAI_API_KEY", "sk-openai-test");
 
-        // Act
+        let config = Config::from_env().unwrap();
+
+        assert_eq!(config.provider, Provider::OpenAi);
+        assert_eq!(config.api_key, "sk-openai-test");
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_from_env_deepseek() {
+        clear_env_keys();
+        env::set_var("DEEPSEEK_API_KEY", "sk-deepseek-test");
+
+        let config = Config::from_env().unwrap();
+
+        assert_eq!(config.provider, Provider::DeepSeek);
+        assert_eq!(config.api_key, "sk-deepseek-test");
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_from_env_gemini() {
+        clear_env_keys();
+        env::set_var("GEMINI_API_KEY", "AIza-gemini-test");
+
+        let config = Config::from_env().unwrap();
+
+        assert_eq!(config.provider, Provider::Gemini);
+        assert_eq!(config.api_key, "AIza-gemini-test");
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_from_env_priority() {
+        clear_env_keys();
+        // Set all keys - OpenAI should win
+        env::set_var("OPENAI_API_KEY", "openai");
+        env::set_var("DEEPSEEK_API_KEY", "deepseek");
+        env::set_var("GEMINI_API_KEY", "gemini");
+
+        let config = Config::from_env().unwrap();
+
+        assert_eq!(config.provider, Provider::OpenAi);
+        assert_eq!(config.api_key, "openai");
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_from_env_missing_key() {
+        clear_env_keys();
+
         let result = Config::from_env();
 
-        // Assert
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_config_from_env_file() {
-        // Arrange
+    fn test_config_from_env_file_openai() {
         let mut temp_file = NamedTempFile::new().unwrap();
-        writeln!(temp_file, "DEEPSEEK_API_KEY='sk-test123'").unwrap();
+        writeln!(temp_file, "OPENAI_API_KEY='sk-test123'").unwrap();
 
-        // Act
         let config = Config::from_env_file(temp_file.path()).unwrap();
 
-        // Assert
-        assert_eq!(config.deepseek_api_key, "sk-test123");
+        assert_eq!(config.provider, Provider::OpenAi);
+        assert_eq!(config.api_key, "sk-test123");
+    }
+
+    #[test]
+    fn test_config_from_env_file_deepseek() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "DEEPSEEK_API_KEY='sk-deepseek'").unwrap();
+
+        let config = Config::from_env_file(temp_file.path()).unwrap();
+
+        assert_eq!(config.provider, Provider::DeepSeek);
+        assert_eq!(config.api_key, "sk-deepseek");
+    }
+
+    #[test]
+    fn test_config_from_env_file_gemini() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "GEMINI_API_KEY='AIza-test'").unwrap();
+
+        let config = Config::from_env_file(temp_file.path()).unwrap();
+
+        assert_eq!(config.provider, Provider::Gemini);
+        assert_eq!(config.api_key, "AIza-test");
     }
 
     #[test]
     fn test_config_from_env_file_with_export() {
-        // Arrange
         let mut temp_file = NamedTempFile::new().unwrap();
-        writeln!(temp_file, "export DEEPSEEK_API_KEY='sk-test456'").unwrap();
+        writeln!(temp_file, "export OPENAI_API_KEY='sk-test456'").unwrap();
 
-        // Act
         let config = Config::from_env_file(temp_file.path()).unwrap();
 
-        // Assert
-        assert_eq!(config.deepseek_api_key, "sk-test456");
+        assert_eq!(config.provider, Provider::OpenAi);
+        assert_eq!(config.api_key, "sk-test456");
+    }
+
+    #[test]
+    fn test_config_from_env_file_priority() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "GEMINI_API_KEY='gemini'").unwrap();
+        writeln!(temp_file, "OPENAI_API_KEY='openai'").unwrap();
+        writeln!(temp_file, "DEEPSEEK_API_KEY='deepseek'").unwrap();
+
+        let config = Config::from_env_file(temp_file.path()).unwrap();
+
+        // OpenAI should be selected (priority)
+        assert_eq!(config.provider, Provider::OpenAi);
+        assert_eq!(config.api_key, "openai");
     }
 
     #[test]
