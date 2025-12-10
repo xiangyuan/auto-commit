@@ -6,7 +6,7 @@
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Crates.io](https://img.shields.io/crates/v/auto-commit.svg)](https://crates.io/crates/auto-commit)
 
-🌐 **Languages**: [English](docs/README.en.md) | [简体中文](docs/README.zh-CN.md) | [Русский](docs/README.ru.md) | [العربية](docs/README.ar.md) | [فارسی](docs/README.fa.md)
+🌐 **Languages**: [English](docs/readmeLang/README.en.md) | [简体中文](docs/readmeLang/README.zh-CN.md) | [繁體中文](docs/readmeLang/README.zh-TW.md) | [Русский](docs/readmeLang/README.ru.md) | [العربية](docs/readmeLang/README.ar.md) | [فارسی](docs/readmeLang/README.fa.md)
 
 ## 概要
 
