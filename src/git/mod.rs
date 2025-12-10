@@ -6,7 +6,7 @@ pub struct GitOperations;
 impl GitOperations {
     pub fn get_staged_diff() -> Result<String> {
         let output = Command::new("git")
-            .args(&["diff", "--staged"])
+            .args(["diff", "--staged"])
             .output()
             .context("Failed to execute git diff")?;
 
@@ -20,7 +20,7 @@ impl GitOperations {
 
     pub fn has_staged_changes() -> Result<bool> {
         let output = Command::new("git")
-            .args(&["diff", "--staged", "--quiet"])
+            .args(["diff", "--staged", "--quiet"])
             .output()
             .context("Failed to execute git diff")?;
 
@@ -30,7 +30,7 @@ impl GitOperations {
 
     pub fn create_commit(message: &str) -> Result<()> {
         let output = Command::new("git")
-            .args(&["commit", "-m", message])
+            .args(["commit", "-m", message])
             .output()
             .context("Failed to execute git commit")?;
 
@@ -44,7 +44,7 @@ impl GitOperations {
 
     pub fn get_current_branch() -> Result<String> {
         let output = Command::new("git")
-            .args(&["rev-parse", "--abbrev-ref", "HEAD"])
+            .args(["rev-parse", "--abbrev-ref", "HEAD"])
             .output()
             .context("Failed to get current branch")?;
 
