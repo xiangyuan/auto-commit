@@ -25,6 +25,8 @@
 
 ### Homebrew (macOS / Linux)
 
+> **準備中**: Homebrew tapは現在準備中です。ソースビルドまたはバイナリダウンロードをご利用ください。
+
 ```bash
 brew tap clearclown/tap
 brew install auto-commit
@@ -46,22 +48,25 @@ cargo install --git https://github.com/clearclown/auto-commit.git
 
 | プラットフォーム | ファイル |
 |-----------------|---------|
-| macOS (Apple Silicon) | `auto-commit-aarch64-apple-darwin.tar.gz` |
-| macOS (Intel) | `auto-commit-x86_64-apple-darwin.tar.gz` |
-| Linux (x86_64) | `auto-commit-x86_64-unknown-linux-gnu.tar.gz` |
-| Linux (ARM64) | `auto-commit-aarch64-unknown-linux-gnu.tar.gz` |
-| Windows (x86_64) | `auto-commit-x86_64-pc-windows-msvc.zip` |
+| macOS (Apple Silicon) | `auto-commit-darwin-aarch64` |
+| macOS (Intel) | `auto-commit-darwin-x86_64` |
+| Linux (x86_64) | `auto-commit-linux-x86_64` |
+| Linux (deb) | `auto-commit-linux-x86_64.deb` |
+| Windows (x86_64) | `auto-commit-win-x86_64.exe` |
 
 ```bash
 # 例: macOS (Apple Silicon)
-curl -LO https://github.com/clearclown/auto-commit/releases/latest/download/auto-commit-aarch64-apple-darwin.tar.gz
-tar xzf auto-commit-aarch64-apple-darwin.tar.gz
-sudo mv auto-commit /usr/local/bin/
+curl -LO https://github.com/clearclown/auto-commit/releases/latest/download/auto-commit-darwin-aarch64
+chmod +x auto-commit-darwin-aarch64
+sudo mv auto-commit-darwin-aarch64 /usr/local/bin/auto-commit
 ```
 
 ### Arch Linux (AUR)
 
+> **注意**: 現在AURの `auto-commit` パッケージはオリジナルの [m1guelpf/auto-commit](https://github.com/m1guelpf/auto-commit) 用です。このフォーク版をインストールするには、Cargo (GitHub) またはソースビルドをご利用ください。
+
 ```bash
+# オリジナル版をインストールする場合
 yay -S auto-commit
 # または
 paru -S auto-commit

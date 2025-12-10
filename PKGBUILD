@@ -1,12 +1,12 @@
 pkgname="auto-commit"
-pkgver=0.1.4
+pkgver=2.0.0
 pkgrel=1
-pkgdesc="A CLI tool that generates commit messages from your staged changes, built in Rust and using OpenAI's Codex."
-arch=("x86_64" "arm")
-license=("mit")
-url='https://github.com/m1guelpf/auto-commit'
-makedepends=("git")
-source=("git+https://github.com/m1guelpf/auto-commit.git")
+pkgdesc="AI-powered Git commit message generator - supports OpenAI, DeepSeek, and Gemini"
+arch=("x86_64" "aarch64")
+license=("MIT")
+url='https://github.com/clearclown/auto-commit'
+makedepends=("git" "cargo")
+source=("git+https://github.com/clearclown/auto-commit.git")
 sha512sums=("SKIP")
 
 pkgver() {
@@ -14,7 +14,13 @@ pkgver() {
   git describe --tags | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
 }
 
+build() {
+  cd "$pkgname"
+  cargo build --release --locked
+}
+
 package() {
-    cd auto-commit
-    bash "./install.sh"
+  cd "$pkgname"
+  install -Dm755 target/release/auto-commit "$pkgdir/usr/bin/auto-commit"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
