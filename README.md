@@ -25,8 +25,6 @@
 
 ### Homebrew (macOS / Linux)
 
-> **準備中**: Homebrew tapは現在準備中です。ソースビルドまたはバイナリダウンロードをご利用ください。
-
 ```bash
 brew tap clearclown/tap
 brew install auto-commit
