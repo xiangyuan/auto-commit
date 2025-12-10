@@ -40,10 +40,10 @@ async fn main() -> Result<()> {
 
     // Generate commit message
     let mut spinner = Spinner::new(Spinners::Dots, "Generating commit message...".into());
-    
-    let client = DeepSeekClient::new(config.deepseek_api_key);
+
+    let client = DeepSeekClient::new(config.deepseek_api_key.clone());
     let (title, description) = client
-        .generate_commit_message(&diff)
+        .generate_commit_message(&diff, config.gitmessage_template.as_deref())
         .await
         .context("Failed to generate commit message")?;
 
