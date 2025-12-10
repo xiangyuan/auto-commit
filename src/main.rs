@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
 
     let client = DeepSeekClient::new(config.deepseek_api_key.clone());
     let (title, description) = client
-        .generate_commit_message(&diff, config.gitmessage_template.as_deref())
+        .generate_commit_message(&diff, Some(&config.gitmessage_template))
         .await
         .context("Failed to generate commit message")?;
 

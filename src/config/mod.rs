@@ -1,33 +1,36 @@
 use anyhow::{Context, Result};
 use std::{env, fs, path::Path};
 
+/// Default .gitmessage template embedded at compile time
+const DEFAULT_GITMESSAGE_TEMPLATE: &str = include_str!("../../docs/.gitmessage");
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub deepseek_api_key: String,
-    pub gitmessage_template: Option<String>,
+    pub gitmessage_template: String,
 }
 
 /// Load .gitmessage template from various locations
 /// Search order:
-/// 1. ~/.gitmessage (user custom)
+/// 1. ~/.gitmessage (user custom) - highest priority
 /// 2. ./.gitmessage (project root)
-/// 3. docs/.gitmessage (default)
-pub fn load_gitmessage_template() -> Option<String> {
+/// 3. Embedded default template (from docs/.gitmessage at build time)
+pub fn load_gitmessage_template() -> String {
     let search_paths = [
         dirs::home_dir().map(|p| p.join(".gitmessage")),
         Some(Path::new(".gitmessage").to_path_buf()),
-        Some(Path::new("docs/.gitmessage").to_path_buf()),
     ];
 
     for path_opt in search_paths.iter().flatten() {
         if path_opt.exists() {
             if let Ok(content) = fs::read_to_string(path_opt) {
-                return Some(content);
+                return content;
             }
         }
     }
 
-    None
+    // Fall back to embedded default template
+    DEFAULT_GITMESSAGE_TEMPLATE.to_string()
 }
 
 impl Config {
@@ -126,16 +129,21 @@ mod tests {
     }
 
     #[test]
-    fn test_load_gitmessage_template_from_docs() {
-        // This test assumes docs/.gitmessage exists in the project
+    fn test_load_gitmessage_template_default() {
+        // Should always return a template (embedded default if no custom file)
         let template = load_gitmessage_template();
 
-        // If running from project root, should find docs/.gitmessage
-        if Path::new("docs/.gitmessage").exists() {
-            assert!(template.is_some());
-            let content = template.unwrap();
-            assert!(content.contains("Commit Message Template"));
-            assert!(content.contains("feat:"));
-        }
+        // Verify embedded template contains expected content
+        assert!(template.contains("Commit Message Template"));
+        assert!(template.contains("feat:"));
+        assert!(template.contains("fix:"));
+    }
+
+    #[test]
+    fn test_default_template_is_embedded() {
+        // Verify the default template is properly embedded at compile time
+        assert!(!DEFAULT_GITMESSAGE_TEMPLATE.is_empty());
+        assert!(DEFAULT_GITMESSAGE_TEMPLATE.contains("Prefix"));
+        assert!(DEFAULT_GITMESSAGE_TEMPLATE.contains("Emojis"));
     }
 }
