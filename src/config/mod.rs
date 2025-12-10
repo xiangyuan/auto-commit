@@ -4,37 +4,64 @@ use std::{env, fs, path::Path};
 #[derive(Debug, Clone)]
 pub struct Config {
     pub deepseek_api_key: String,
+    pub gitmessage_template: Option<String>,
+}
+
+/// Load .gitmessage template from various locations
+/// Search order:
+/// 1. ~/.gitmessage (user custom)
+/// 2. ./.gitmessage (project root)
+/// 3. docs/.gitmessage (default)
+pub fn load_gitmessage_template() -> Option<String> {
+    let search_paths = [
+        dirs::home_dir().map(|p| p.join(".gitmessage")),
+        Some(Path::new(".gitmessage").to_path_buf()),
+        Some(Path::new("docs/.gitmessage").to_path_buf()),
+    ];
+
+    for path_opt in search_paths.iter().flatten() {
+        if path_opt.exists() {
+            if let Ok(content) = fs::read_to_string(path_opt) {
+                return Some(content);
+            }
+        }
+    }
+
+    None
 }
 
 impl Config {
     pub fn from_env() -> Result<Self> {
         let deepseek_api_key = env::var("DEEPSEEK_API_KEY")
             .context("DEEPSEEK_API_KEY environment variable not found")?;
-        
-        Ok(Self { deepseek_api_key })
+        let gitmessage_template = load_gitmessage_template();
+
+        Ok(Self { deepseek_api_key, gitmessage_template })
     }
 
     pub fn from_env_file(path: &Path) -> Result<Self> {
         let content = fs::read_to_string(path)
             .context("Failed to read .env file")?;
-        
+
         let mut api_key = None;
-        
+
         for line in content.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-            
+
             if let Some(key_value) = line.strip_prefix("DEEPSEEK_API_KEY=") {
                 api_key = Some(key_value.trim_matches('\'').trim_matches('"').to_string());
             } else if let Some(key_value) = line.strip_prefix("export DEEPSEEK_API_KEY=") {
                 api_key = Some(key_value.trim_matches('\'').trim_matches('"').to_string());
             }
         }
-        
+
         let deepseek_api_key = api_key.context("DEEPSEEK_API_KEY not found in .env file")?;
-        Ok(Self { deepseek_api_key })
+        let gitmessage_template = load_gitmessage_template();
+
+        Ok(Self { deepseek_api_key, gitmessage_template })
     }
 }
 
@@ -96,5 +123,19 @@ mod tests {
 
         // Assert
         assert_eq!(config.deepseek_api_key, "sk-test456");
+    }
+
+    #[test]
+    fn test_load_gitmessage_template_from_docs() {
+        // This test assumes docs/.gitmessage exists in the project
+        let template = load_gitmessage_template();
+
+        // If running from project root, should find docs/.gitmessage
+        if Path::new("docs/.gitmessage").exists() {
+            assert!(template.is_some());
+            let content = template.unwrap();
+            assert!(content.contains("Commit Message Template"));
+            assert!(content.contains("feat:"));
+        }
     }
 }
