@@ -27,6 +27,7 @@ dotenv = "0.15.0"
 anyhow = "1.0"
 thiserror = "1.0"
 tempfile = "3.8"
+dirs = "6.0.0"
 
 [dev-dependencies]
 mockito = "1.1"
