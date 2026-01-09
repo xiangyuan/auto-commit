@@ -100,8 +100,10 @@ impl LlmClient for GeminiClient {
         &self,
         diff: &str,
         template: Option<&str>,
+        emoji_guide: Option<&str>,
+        selected_type: Option<(&str, &str, &str)>,
     ) -> Result<(String, String)> {
-        let prompt = build_prompt(diff, template);
+        let prompt = build_prompt(diff, template, emoji_guide, selected_type);
         let system_prompt = self.build_system_prompt(template);
 
         let request = GeminiRequest {

@@ -2,14 +2,15 @@ use anyhow::{Context, Result};
 use auto_commit::{
     api::create_client_for_provider,
     cli::Cli,
-    config::Config,
+    config::{Config, parse_emoji_mappings},
+    emoji::extract_commit_types,
     formatter::{CommitData, CommitFormatter},
     git::GitOperations,
 };
 use log::info;
 use question::{Answer, Question};
 use spinners::{Spinner, Spinners};
-use std::{env, io::Write, path::Path, process::Command};
+use std::{env, io::{self, Write}, path::Path, process::Command};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -38,6 +39,20 @@ async fn main() -> Result<()> {
         std::process::exit(1);
     }
 
+    // Interactive commit type selection
+    let commit_types = extract_commit_types(&config.gitmessage_template);
+    let selected_type = select_commit_type(&commit_types)?;
+    
+    println!("Selected: {} {} {}\n", selected_type.0, selected_type.1, selected_type.2);
+
+    // Parse emoji mappings from .gitmessage template
+    let emoji_guide = parse_emoji_mappings(&config.gitmessage_template);
+    let emoji_guide_opt = if emoji_guide.is_empty() {
+        None
+    } else {
+        Some(emoji_guide)
+    };
+
     // Generate commit message
     let provider_name = config.provider.to_string();
     let mut spinner = Spinner::new(
@@ -47,7 +62,12 @@ async fn main() -> Result<()> {
 
     let client = create_client_for_provider(config.provider, config.api_key.clone());
     let (title, description) = client
-        .generate_commit_message(&diff, Some(&config.gitmessage_template))
+        .generate_commit_message(
+            &diff,
+            Some(&config.gitmessage_template),
+            emoji_guide_opt.as_deref(),
+            Some((&selected_type.0, &selected_type.1, &selected_type.2)),
+        )
         .await
         .context("Failed to generate commit message")?;
 
@@ -93,6 +113,41 @@ async fn main() -> Result<()> {
     println!("✓ Commit created successfully!");
 
     Ok(())
+}
+
+fn select_commit_type(types: &[(String, String, String)]) -> Result<(String, String, String)> {
+    println!("请选择 commit 类型:");
+    println!();
+    
+    for (i, (prefix, emoji, desc)) in types.iter().enumerate() {
+        println!("  {}. {} {} {}", i + 1, emoji, prefix, desc);
+    }
+    
+    println!();
+    print!("请输入序号 (1-{}) 或直接输入类型名称: ", types.len());
+    io::stdout().flush()?;
+    
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let input = input.trim();
+    
+    // 尝试作为数字解析
+    if let Ok(num) = input.parse::<usize>() {
+        if num > 0 && num <= types.len() {
+            return Ok(types[num - 1].clone());
+        }
+    }
+    
+    // 尝试作为类型名称匹配
+    for (prefix, emoji, desc) in types {
+        if prefix.eq_ignore_ascii_case(input) {
+            return Ok((prefix.clone(), emoji.clone(), desc.clone()));
+        }
+    }
+    
+    // 默认返回第一个
+    println!("无效的选择，使用默认类型");
+    Ok(types[0].clone())
 }
 
 fn load_config() -> Result<Config> {

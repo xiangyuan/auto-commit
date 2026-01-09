@@ -74,8 +74,10 @@ impl LlmClient for OpenAiCompatibleClient {
         &self,
         diff: &str,
         template: Option<&str>,
+        emoji_guide: Option<&str>,
+        selected_type: Option<(&str, &str, &str)>,
     ) -> Result<(String, String)> {
-        let prompt = build_prompt(diff, template);
+        let prompt = build_prompt(diff, template, emoji_guide, selected_type);
 
         let request = ChatRequest {
             model: self.model.clone(),

@@ -36,6 +36,67 @@ pub fn load_gitmessage_template() -> String {
     DEFAULT_GITMESSAGE_TEMPLATE.to_string()
 }
 
+/// Parse emoji mappings from .gitmessage template content
+/// Returns a formatted string with prefix -> emoji mappings
+pub fn parse_emoji_mappings(template: &str) -> String {
+    let mut mappings = Vec::new();
+    
+    for line in template.lines() {
+        let line = line.trim();
+        // Look for emoji mapping lines like: "#  🐛  :bug:           fix"
+        if line.starts_with('#') && line.contains(':') {
+            // Extract emoji and prefix
+            if let Some(emoji) = extract_emoji_from_line(line) {
+                if let Some(prefix) = extract_prefix_from_line(line) {
+                    mappings.push((prefix, emoji));
+                }
+            }
+        }
+    }
+    
+    if mappings.is_empty() {
+        return String::new();
+    }
+    
+    let mut result = String::from("根据以下 emoji 映射选择合适的类型：\n");
+    for (prefix, emoji) in mappings {
+        result.push_str(&format!("- {}: {}\n", prefix, emoji));
+    }
+    
+    result
+}
+
+fn extract_emoji_from_line(line: &str) -> Option<String> {
+    // Find the first emoji character (after the initial #)
+    let chars: Vec<char> = line.chars().collect();
+    for c in chars.iter().skip(1) {
+        if is_emoji_char(*c) {
+            return Some(c.to_string());
+        }
+    }
+    None
+}
+
+fn extract_prefix_from_line(line: &str) -> Option<String> {
+    // Extract the last word in the line (the prefix)
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    parts.last().map(|s| s.to_string())
+}
+
+fn is_emoji_char(c: char) -> bool {
+    // Common emoji ranges
+    matches!(c as u32,
+        0x1F300..=0x1F9FF | // Misc Symbols and Pictographs, Emoticons, etc.
+        0x2600..=0x26FF |   // Misc symbols
+        0x2700..=0x27BF |   // Dingbats
+        0x231A..=0x231B |   // Watch, Hourglass
+        0x23E9..=0x23F3 |   // Media controls
+        0x25AA..=0x25AB |   // Squares
+        0x25B6 | 0x25C0 |   // Play buttons
+        0x2B50 | 0x2B55     // Star, Circle
+    )
+}
+
 impl Config {
     /// Load config from environment variables
     /// Detects provider automatically based on which API key is set
