@@ -26,6 +26,29 @@ pub trait LlmClient: Send + Sync {
     fn provider_name(&self) -> &str;
 }
 
+/// Truncate diff if it exceeds maximum length
+/// Keeps important parts at the beginning and end
+fn truncate_diff(diff: &str, max_chars: usize) -> String {
+    if diff.len() <= max_chars {
+        return diff.to_string();
+    }
+    
+    // Keep first 60% and last 20% of the allowed space, with a truncation notice
+    let truncation_notice = "\n\n... [diff truncated due to length] ...\n\n";
+    let available_chars = max_chars.saturating_sub(truncation_notice.len());
+    let first_part_size = (available_chars as f64 * 0.6) as usize;
+    let last_part_size = (available_chars as f64 * 0.2) as usize;
+    
+    let first_part = &diff[..first_part_size.min(diff.len())];
+    let last_part = if diff.len() > first_part_size + last_part_size {
+        &diff[diff.len().saturating_sub(last_part_size)..]
+    } else {
+        ""
+    };
+    
+    format!("{}{}{}", first_part, truncation_notice, last_part)
+}
+
 /// Build prompt for commit message generation
 pub fn build_prompt(
     diff: &str,
@@ -43,6 +66,11 @@ pub fn build_prompt(
     } else {
         String::new()
     };
+    
+    // Truncate diff to avoid token limit issues
+    // DeepSeek has 131,072 token limit; using ~300,000 chars (~75k tokens) for diff
+    // to leave room for system message, instructions, and completion
+    let truncated_diff = truncate_diff(diff, 300_000);
 
     let type_instruction = if let Some((prefix, emoji, desc)) = selected_type {
         match lang {
@@ -147,7 +175,7 @@ pub fn build_prompt(
         {}\n\
         ```\n{}\n```",
         intro, rule_header, rules, emoji_section, type_instruction, 
-        instruction_header, instruction_items, diff_header, diff
+        instruction_header, instruction_items, diff_header, truncated_diff
     )
 }
 
@@ -235,7 +263,7 @@ mod tests {
     fn test_build_prompt_with_template() {
         let diff = "+added line";
         let template = "Custom template";
-        let prompt = build_prompt(diff, Some(template));
+        let prompt = build_prompt(diff, Some(template), None, None);
         assert!(prompt.contains("Custom template"));
         assert!(prompt.contains("+added line"));
     }
@@ -243,8 +271,32 @@ mod tests {
     #[test]
     fn test_build_prompt_without_template() {
         let diff = "+added line";
-        let prompt = build_prompt(diff, None);
+        let prompt = build_prompt(diff, None, None, None);
         assert!(prompt.contains("使用可能なprefix"));
         assert!(prompt.contains("+added line"));
+    }
+    
+    #[test]
+    fn test_truncate_diff_short() {
+        let diff = "+short diff";
+        let result = truncate_diff(diff, 1000);
+        assert_eq!(result, "+short diff");
+    }
+    
+    #[test]
+    fn test_truncate_diff_long() {
+        let diff = "a".repeat(100000);
+        let result = truncate_diff(&diff, 1000);
+        assert!(result.len() <= 1100); // Allow small margin for notice
+        assert!(result.contains("[diff truncated due to length]"));
+    }
+    
+    #[test]
+    fn test_truncate_diff_preserves_beginning_and_end() {
+        let diff = format!("{}middle{}", "start".repeat(10000), "end".repeat(10000));
+        let result = truncate_diff(&diff, 10000);
+        assert!(result.starts_with("start"));
+        assert!(result.ends_with("end"));
+        assert!(result.contains("[diff truncated due to length]"));
     }
 }
