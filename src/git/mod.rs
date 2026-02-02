@@ -1,18 +1,90 @@
 use anyhow::{Context, Result};
 use std::process::Command;
 
+/// Maximum diff size in bytes (100KB) - larger diffs will be truncated
+const MAX_DIFF_SIZE: usize = 100 * 1024;
+
+/// Binary file extensions to exclude from diff (these can cause git diff to hang or use excessive memory)
+const BINARY_EXTENSIONS: &[&str] = &[
+    "*.so", "*.dll", "*.dylib", "*.a", "*.lib",  // Native libraries
+    "*.exe", "*.bin", "*.o", "*.obj",            // Executables and objects
+    "*.zip", "*.tar", "*.gz", "*.bz2", "*.xz", "*.7z", "*.rar",  // Archives
+    "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.ico", "*.webp", "*.tiff",  // Images
+    "*.mp3", "*.mp4", "*.wav", "*.avi", "*.mov", "*.mkv", "*.flv", "*.wmv",  // Media
+    "*.pdf", "*.doc", "*.docx", "*.xls", "*.xlsx", "*.ppt", "*.pptx",  // Documents
+    "*.woff", "*.woff2", "*.ttf", "*.otf", "*.eot",  // Fonts
+    "*.pyc", "*.pyo", "*.class",  // Compiled code
+    "*.wasm",  // WebAssembly
+];
+
 pub struct GitOperations;
 
 impl GitOperations {
     pub fn get_staged_diff() -> Result<String> {
+        // First, get the list of staged files (including binary files)
+        let staged_files = Self::get_staged_file_names()?;
+        
+        if staged_files.trim().is_empty() {
+            return Ok(String::new());
+        }
+        
+        // Build pathspec to exclude binary files
+        let mut args = vec![
+            "diff".to_string(),
+            "--staged".to_string(),
+            "--no-ext-diff".to_string(),
+            "--no-color".to_string(),
+            "--".to_string(),
+        ];
+        
+        // Add exclusions for binary file extensions
+        for ext in BINARY_EXTENSIONS {
+            args.push(format!(":(exclude){}", ext));
+        }
+        
+        // Get text diff, excluding binary content
         let output = Command::new("git")
-            .args(["diff", "--staged"])
+            .args(&args)
             .output()
             .context("Failed to execute git diff")?;
 
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
             return Err(anyhow::anyhow!("git diff failed: {}", error));
+        }
+
+        let mut diff = String::from_utf8_lossy(&output.stdout).to_string();
+        
+        // Truncate if too large, keeping the beginning
+        if diff.len() > MAX_DIFF_SIZE {
+            diff.truncate(MAX_DIFF_SIZE);
+            diff.push_str("\n\n... [diff truncated due to size] ...\n");
+        }
+        
+        // Always append staged files summary so AI knows about all files including binaries
+        if !staged_files.trim().is_empty() {
+            diff.push_str("\n\n--- Staged files summary ---\n");
+            diff.push_str(&staged_files);
+        }
+        
+        // If diff content is empty but we have staged files, make it clearer
+        if diff.trim().starts_with("--- Staged files summary ---") {
+            diff = format!("Binary or empty files staged:\n{}", staged_files);
+        }
+
+        Ok(diff)
+    }
+    
+    /// Get the list of staged file names with their status
+    fn get_staged_file_names() -> Result<String> {
+        let output = Command::new("git")
+            .args(["diff", "--staged", "--name-status"])
+            .output()
+            .context("Failed to execute git diff --name-status")?;
+
+        if !output.status.success() {
+            let error = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("git diff --name-status failed: {}", error));
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
