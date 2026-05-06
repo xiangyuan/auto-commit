@@ -57,7 +57,17 @@ impl GitOperations {
         
         // Truncate if too large, keeping the beginning
         if diff.len() > MAX_DIFF_SIZE {
-            diff.truncate(MAX_DIFF_SIZE);
+            // Find a valid UTF-8 boundary to truncate at
+            let truncate_at = if diff.is_char_boundary(MAX_DIFF_SIZE) {
+                MAX_DIFF_SIZE
+            } else {
+                // Search backwards for a valid boundary
+                (0..MAX_DIFF_SIZE)
+                    .rev()
+                    .find(|&i| diff.is_char_boundary(i))
+                    .unwrap_or(0)
+            };
+            diff.truncate(truncate_at);
             diff.push_str("\n\n... [diff truncated due to size] ...\n");
         }
         
