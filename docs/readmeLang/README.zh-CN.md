@@ -1,6 +1,6 @@
 # auto-commit
 
-> AI 驱动的 Git 提交信息自动生成工具 - 支持 OpenAI / DeepSeek / Gemini
+> AI 驱动的 Git 提交信息自动生成工具 - 支持 OpenAI / DeepSeek / Gemini / Grok
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -10,11 +10,11 @@
 
 ## 概述
 
-`auto-commit` 是一个分析暂存更改并自动生成适当提交信息的 CLI 工具。本项目是 [m1guelpf/auto-commit](https://github.com/m1guelpf/auto-commit) 的分支版本，支持多个 LLM 提供商（OpenAI、DeepSeek、Gemini），并添加了可自定义的提交信息格式功能。
+`auto-commit` 是一个分析暂存更改并自动生成适当提交信息的 CLI 工具。本项目是 [m1guelpf/auto-commit](https://github.com/m1guelpf/auto-commit) 的分支版本，支持多个 LLM 提供商（OpenAI、DeepSeek、Gemini、Grok），并添加了可自定义的提交信息格式功能。
 
 ## 特性
 
-- 🤖 **多提供商支持**：可选择 OpenAI、DeepSeek 或 Google Gemini
+- 🤖 **多提供商支持**：可选择 OpenAI、DeepSeek、Google Gemini 或 Grok
 - 🎨 **自定义格式**：通过 `--format` 选项自由定制消息格式
 - 📝 **.gitmessage 模板**：可设置项目特定的提交规则
 - 🚀 **高性能**：基于 Rust 构建，轻量且快速
@@ -74,7 +74,7 @@ sudo mv target/release/auto-commit /usr/local/bin/
 
 将 LLM 提供商的 API 密钥设置为环境变量。如果设置了多个密钥，将按优先级自动选择。
 
-**优先级**：`OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY`
+**优先级**：`OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY` > `XAI_API_KEY`
 
 ```bash
 # 使用 OpenAI
@@ -85,6 +85,9 @@ export DEEPSEEK_API_KEY='sk-...'
 
 # 使用 Google Gemini
 export GEMINI_API_KEY='AIza...'
+
+# 使用 Grok (xAI)
+export XAI_API_KEY='xai-...'
 ```
 
 或在项目根目录创建 `.env` 文件：
@@ -93,6 +96,8 @@ export GEMINI_API_KEY='AIza...'
 OPENAI_API_KEY='sk-...'
 # DEEPSEEK_API_KEY='sk-...'
 # GEMINI_API_KEY='AIza...'
+# XAI_API_KEY='xai-...'
+# XAI_MODEL='grok-4.5'
 ```
 
 ## 使用方法
@@ -129,6 +134,12 @@ auto-commit --force
 # 自定义格式
 auto-commit --format "{emoji} {prefix}: {title}"
 
+# 显式指定提供商
+auto-commit --provider grok
+
+# 覆盖模型
+auto-commit --provider grok --model grok-4.5
+
 # 详细日志输出
 auto-commit -v
 ```
@@ -150,6 +161,9 @@ auto-commit -v
 | OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` |
 | DeepSeek | `deepseek-chat` | `DEEPSEEK_API_KEY` |
 | Google Gemini | `gemini-2.0-flash` | `GEMINI_API_KEY` |
+| Grok (xAI) | `grok-4.7` | `XAI_API_KEY` |
+
+默认模型可用 `--model`，或 `OPENAI_MODEL`、`DEEPSEEK_MODEL`、`GEMINI_MODEL`、`XAI_MODEL` 覆盖。`--model` 优先。
 
 ## 许可证
 

@@ -1,6 +1,6 @@
 # auto-commit
 
-> Генератор сообщений Git-коммитов на основе ИИ - поддержка OpenAI / DeepSeek / Gemini
+> Генератор сообщений Git-коммитов на основе ИИ - поддержка OpenAI / DeepSeek / Gemini / Grok
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -10,11 +10,11 @@
 
 ## Обзор
 
-`auto-commit` — это CLI-инструмент, который анализирует подготовленные изменения и автоматически генерирует подходящие сообщения коммитов. Этот проект является форком [m1guelpf/auto-commit](https://github.com/m1guelpf/auto-commit) с поддержкой нескольких LLM-провайдеров (OpenAI, DeepSeek, Gemini) и настраиваемым форматированием сообщений коммитов.
+`auto-commit` — это CLI-инструмент, который анализирует подготовленные изменения и автоматически генерирует подходящие сообщения коммитов. Этот проект является форком [m1guelpf/auto-commit](https://github.com/m1guelpf/auto-commit) с поддержкой нескольких LLM-провайдеров (OpenAI, DeepSeek, Gemini, Grok) и настраиваемым форматированием сообщений коммитов.
 
 ## Возможности
 
-- 🤖 **Поддержка нескольких провайдеров**: Выбор между OpenAI, DeepSeek или Google Gemini
+- 🤖 **Поддержка нескольких провайдеров**: Выбор между OpenAI, DeepSeek, Google Gemini или Grok
 - 🎨 **Пользовательское форматирование**: Свободная настройка формата сообщений с опцией `--format`
 - 📝 **Шаблоны .gitmessage**: Установка правил коммитов для конкретного проекта
 - 🚀 **Быстрое выполнение**: Написан на Rust для легкой и быстрой работы
@@ -74,7 +74,7 @@ sudo mv target/release/auto-commit /usr/local/bin/
 
 Установите API-ключ вашего LLM-провайдера как переменную окружения. Если установлено несколько ключей, они автоматически выбираются по приоритету.
 
-**Приоритет**: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY`
+**Приоритет**: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY` > `XAI_API_KEY`
 
 ```bash
 # Использовать OpenAI
@@ -85,6 +85,9 @@ export DEEPSEEK_API_KEY='sk-...'
 
 # Использовать Google Gemini
 export GEMINI_API_KEY='AIza...'
+
+# Использовать Grok (xAI)
+export XAI_API_KEY='xai-...'
 ```
 
 Или создайте файл `.env` в корне проекта:
@@ -93,6 +96,8 @@ export GEMINI_API_KEY='AIza...'
 OPENAI_API_KEY='sk-...'
 # DEEPSEEK_API_KEY='sk-...'
 # GEMINI_API_KEY='AIza...'
+# XAI_API_KEY='xai-...'
+# XAI_MODEL='grok-4.5'
 ```
 
 ## Использование
@@ -129,6 +134,12 @@ auto-commit --force
 # Пользовательский формат
 auto-commit --format "{emoji} {prefix}: {title}"
 
+# Явно выбрать провайдера
+auto-commit --provider grok
+
+# Переопределить модель
+auto-commit --provider grok --model grok-4.5
+
 # Подробное логирование
 auto-commit -v
 ```
@@ -150,6 +161,9 @@ auto-commit -v
 | OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` |
 | DeepSeek | `deepseek-chat` | `DEEPSEEK_API_KEY` |
 | Google Gemini | `gemini-2.0-flash` | `GEMINI_API_KEY` |
+| Grok (xAI) | `grok-4.7` | `XAI_API_KEY` |
+
+Модель по умолчанию можно переопределить флагом `--model` или переменными `OPENAI_MODEL`, `DEEPSEEK_MODEL`, `GEMINI_MODEL`, `XAI_MODEL`. `--model` имеет приоритет.
 
 ## Лицензия
 
