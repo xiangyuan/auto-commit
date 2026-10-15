@@ -1,6 +1,8 @@
 use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 
+use crate::api::Provider;
+
 #[derive(Parser, Debug)]
 #[command(version)]
 #[command(name = "Auto Commit")]
@@ -31,6 +33,31 @@ pub struct Cli {
         help = "Custom message format with placeholders like {title}, {description}, {prefix}, {emoji}, {scope}"
     )]
     pub format: Option<String>,
+
+    #[arg(
+        long,
+        value_parser = parse_provider,
+        help = "LLM provider to use. Overrides automatic detection. One of: openai, deepseek, gemini, grok"
+    )]
+    pub provider: Option<Provider>,
+
+    #[arg(
+        long,
+        help = "Model id override for the selected provider. Also reads OPENAI_MODEL, DEEPSEEK_MODEL, GEMINI_MODEL, or XAI_MODEL"
+    )]
+    pub model: Option<String>,
+}
+
+fn parse_provider(raw: &str) -> Result<Provider, String> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "openai" | "open-ai" => Ok(Provider::OpenAi),
+        "deepseek" | "deep-seek" => Ok(Provider::DeepSeek),
+        "gemini" => Ok(Provider::Gemini),
+        "grok" | "xai" => Ok(Provider::Grok),
+        other => Err(format!(
+            "unknown provider '{other}'. expected openai, deepseek, gemini, or grok"
+        )),
+    }
 }
 
 impl Cli {
@@ -69,7 +96,8 @@ mod tests {
         ];
 
         for (name, expected) in cases {
-            let cli = Cli::parse_from(["auto-commit", "--provider", name, "--model", "custom-model"]);
+            let cli =
+                Cli::parse_from(["auto-commit", "--provider", name, "--model", "custom-model"]);
             assert_eq!(cli.provider, Some(expected), "{name}");
             assert_eq!(cli.model.as_deref(), Some("custom-model"));
         }
@@ -108,7 +136,13 @@ mod tests {
 
     #[test]
     fn test_parse_multiple_options() {
-        let args = vec!["auto-commit", "--dry-run", "--force", "--format", "custom: {title}"];
+        let args = vec![
+            "auto-commit",
+            "--dry-run",
+            "--force",
+            "--format",
+            "custom: {title}",
+        ];
         let cli = Cli::parse_from(args);
         assert!(cli.dry_run);
         assert!(cli.force);

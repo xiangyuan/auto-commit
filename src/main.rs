@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use auto_commit::{
-    api::create_client_for_provider,
+    api::{create_client_with_model, Provider},
     cli::Cli,
-    config::{Config, parse_emoji_mappings},
+    config::{parse_emoji_mappings, Config},
     emoji::extract_commit_types,
     formatter::{CommitData, CommitFormatter},
     git::GitOperations,
@@ -10,7 +10,12 @@ use auto_commit::{
 use log::info;
 use question::{Answer, Question};
 use spinners::{Spinner, Spinners};
-use std::{env, io::{self, Write}, path::Path, process::Command};
+use std::{
+    env,
+    io::{self, Write},
+    path::Path,
+    process::Command,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,8 +34,12 @@ async fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    // Load configuration
-    let config = load_config()?;
+    // Load configuration. --provider selects one key; --model overrides the model id.
+    let config = load_config(cli.provider)?;
+    let config = match cli.model.clone() {
+        Some(model) => config.with_model(model),
+        None => config,
+    };
 
     // Get staged diff
     let diff = GitOperations::get_staged_diff()?;
@@ -42,8 +51,11 @@ async fn main() -> Result<()> {
     // Interactive commit type selection
     let commit_types = extract_commit_types(&config.gitmessage_template);
     let selected_type = select_commit_type(&commit_types)?;
-    
-    println!("Selected: {} {} {}\n", selected_type.0, selected_type.1, selected_type.2);
+
+    println!(
+        "Selected: {} {} {}\n",
+        selected_type.0, selected_type.1, selected_type.2
+    );
 
     // Parse emoji mappings from .gitmessage template
     let emoji_guide = parse_emoji_mappings(&config.gitmessage_template);
@@ -60,7 +72,11 @@ async fn main() -> Result<()> {
         format!("Generating commit message using {}...", provider_name),
     );
 
-    let client = create_client_for_provider(config.provider, config.api_key.clone());
+    let client = create_client_with_model(
+        config.provider,
+        config.api_key.clone(),
+        Some(config.model.clone()),
+    );
     let (title, description) = client
         .generate_commit_message(
             &diff,
@@ -118,49 +134,49 @@ async fn main() -> Result<()> {
 fn select_commit_type(types: &[(String, String, String)]) -> Result<(String, String, String)> {
     println!("请选择 commit 类型:");
     println!();
-    
+
     for (i, (prefix, emoji, desc)) in types.iter().enumerate() {
         println!("  {}. {} {} {}", i + 1, emoji, prefix, desc);
     }
-    
+
     println!();
     print!("请输入序号 (1-{}) 或直接输入类型名称: ", types.len());
     io::stdout().flush()?;
-    
+
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
     let input = input.trim();
-    
+
     // 尝试作为数字解析
     if let Ok(num) = input.parse::<usize>() {
         if num > 0 && num <= types.len() {
             return Ok(types[num - 1].clone());
         }
     }
-    
+
     // 尝试作为类型名称匹配
     for (prefix, emoji, desc) in types {
         if prefix.eq_ignore_ascii_case(input) {
             return Ok((prefix.clone(), emoji.clone(), desc.clone()));
         }
     }
-    
+
     // 默认返回第一个
     println!("无效的选择，使用默认类型");
     Ok(types[0].clone())
 }
 
-fn load_config() -> Result<Config> {
+fn load_config(provider: Option<Provider>) -> Result<Config> {
     // Try to load from .env file in src directory first
     let env_path = Path::new("src/.env");
     if env_path.exists() {
-        if let Ok(config) = Config::from_env_file(env_path) {
+        if let Ok(config) = Config::from_env_file_for(env_path, provider) {
             return Ok(config);
         }
     }
 
-    // Fall back to environment variable
-    Config::from_env()
+    // Fall back to environment variables
+    Config::from_env_for(provider)
 }
 
 fn edit_message(message: &str) -> Result<String> {
