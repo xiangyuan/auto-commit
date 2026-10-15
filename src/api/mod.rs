@@ -1,10 +1,12 @@
 mod client;
 mod gemini;
+mod grok_build;
 mod openai_compatible;
 mod provider;
 
 pub use client::LlmClient;
 pub use gemini::GeminiClient;
+pub use grok_build::GrokBuildClient;
 pub use openai_compatible::OpenAiCompatibleClient;
 pub use provider::Provider;
 
@@ -12,7 +14,7 @@ use anyhow::{Context, Result};
 
 /// Create an LLM client based on available API keys.
 ///
-/// Priority order: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY` > `XAI_API_KEY`.
+/// Priority order: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY`, then a Grok Build login.
 pub fn create_client() -> Result<Box<dyn LlmClient>> {
     let (provider, api_key) = Provider::detect().context(Provider::missing_key_message())?;
 
@@ -32,15 +34,22 @@ pub fn create_client_with_model(
     api_key: String,
     model: Option<String>,
 ) -> Box<dyn LlmClient> {
+    if provider == Provider::Grok {
+        return Box::new(GrokBuildClient::new(
+            model.filter(|value| !value.is_empty()),
+        ));
+    }
+
     let model = model
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| provider.resolve_model());
 
     match provider {
-        Provider::OpenAi | Provider::DeepSeek | Provider::Grok => {
+        Provider::OpenAi | Provider::DeepSeek => {
             Box::new(OpenAiCompatibleClient::new(provider, api_key).with_model(model))
         }
         Provider::Gemini => Box::new(GeminiClient::new(api_key).with_model(model)),
+        Provider::Grok => unreachable!("Grok Build is constructed above"),
     }
 }
 
@@ -77,6 +86,21 @@ mod tests {
         std::env::remove_var("GEMINI_API_KEY");
         std::env::remove_var("XAI_API_KEY");
         std::env::remove_var("XAI_MODEL");
+        hide_grok_session();
+    }
+
+    fn hide_grok_session() {
+        let dir = std::env::temp_dir().join("auto-commit-no-grok-session");
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::remove_file(dir.join("auth.json"));
+        std::env::set_var("GROK_HOME", &dir);
+    }
+
+    fn login_grok_session() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("auth.json"), b"{}\n").unwrap();
+        std::env::set_var("GROK_HOME", dir.path());
+        dir
     }
 
     #[test]
@@ -119,10 +143,10 @@ mod tests {
     #[serial]
     fn test_create_client_grok() {
         clear_env_keys();
-        std::env::set_var("XAI_API_KEY", "xai-test");
+        let _session = login_grok_session();
 
         let client = create_client().unwrap();
-        assert_eq!(client.provider_name(), "Grok");
+        assert_eq!(client.provider_name(), "Grok Build");
 
         clear_env_keys();
     }
@@ -134,7 +158,7 @@ mod tests {
 
         match create_client() {
             Ok(_) => panic!("expected missing API key error"),
-            Err(err) => assert!(err.to_string().contains("XAI_API_KEY")),
+            Err(err) => assert!(err.to_string().contains("grok login")),
         }
 
         clear_env_keys();
@@ -151,8 +175,8 @@ mod tests {
         let gemini = create_client_for_provider(Provider::Gemini, "key".into());
         assert_eq!(gemini.provider_name(), "Gemini");
 
-        let grok = create_client_for_provider(Provider::Grok, "key".into());
-        assert_eq!(grok.provider_name(), "Grok");
+        let grok = create_client_for_provider(Provider::Grok, String::new());
+        assert_eq!(grok.provider_name(), "Grok Build");
     }
 
     #[test]
@@ -163,7 +187,7 @@ mod tests {
 
         let client =
             create_client_with_model(Provider::Grok, "key".into(), Some("grok-4.5".into()));
-        assert_eq!(client.provider_name(), "Grok");
+        assert_eq!(client.provider_name(), "Grok Build");
 
         clear_env_keys();
     }

@@ -8,7 +8,7 @@ categories = ["command-line-utilities", "development-tools"]
 keywords = ["git", "commit", "ai", "openai", "llm"]
 homepage = "https://github.com/clearclown/auto-commit"
 repository = "https://github.com/clearclown/auto-commit"
-description = "AI-powered Git commit message generator - supports OpenAI, DeepSeek, Gemini, and Grok"
+description = "AI-powered Git commit message generator - supports OpenAI, DeepSeek, Gemini, and Grok Build"
 authors = ["clearclown", "Miguel Piedrafita <soy@miguelpiedrafita.com>"]
 
 [dependencies]

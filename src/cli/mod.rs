@@ -37,7 +37,7 @@ pub struct Cli {
     #[arg(
         long,
         value_parser = parse_provider,
-        help = "LLM provider to use. Overrides automatic detection. One of: openai, deepseek, gemini, grok"
+        help = "LLM provider to use. Overrides automatic detection. One of: openai, deepseek, gemini, grok. grok uses a Grok Build login (`grok login`), not an API key"
     )]
     pub provider: Option<Provider>,
 

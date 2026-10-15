@@ -1,4 +1,5 @@
 use std::fmt;
+use std::path::PathBuf;
 
 /// Supported LLM providers.
 ///
@@ -12,7 +13,7 @@ pub enum Provider {
 }
 
 impl Provider {
-    /// Detection order. The first provider with a non-empty API key wins.
+    /// Detection order. The first configured provider wins. API-key providers need a non-empty key. Grok wins when a Grok Build session exists.
     pub fn priority() -> [Self; 4] {
         [Self::OpenAi, Self::DeepSeek, Self::Gemini, Self::Grok]
     }
@@ -25,12 +26,14 @@ impl Provider {
     }
 
     /// Environment variable that holds this provider's API key.
+    ///
+    /// Grok Build uses the `grok login` session instead of an API key.
     pub fn api_key_var(&self) -> &'static str {
         match self {
             Self::OpenAi => "OPENAI_API_KEY",
             Self::DeepSeek => "DEEPSEEK_API_KEY",
             Self::Gemini => "GEMINI_API_KEY",
-            Self::Grok => "XAI_API_KEY",
+            Self::Grok => "",
         }
     }
 
@@ -50,12 +53,35 @@ impl Provider {
             Self::OpenAi => "OpenAI",
             Self::DeepSeek => "DeepSeek",
             Self::Gemini => "Gemini",
-            Self::Grok => "Grok",
+            Self::Grok => "Grok Build",
         }
     }
 
+    /// Directory where Grok Build stores `auth.json`. `GROK_HOME` overrides the default.
+    pub fn grok_home() -> PathBuf {
+        if let Some(home) = non_empty_var("GROK_HOME") {
+            return PathBuf::from(home);
+        }
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".grok")
+    }
+
+    /// True when Grok Build has a non-empty cached login. The file contents are not read.
+    pub fn has_grok_session() -> bool {
+        let path = Self::grok_home().join("auth.json");
+        std::fs::metadata(path)
+            .map(|meta| meta.is_file() && meta.len() > 0)
+            .unwrap_or(false)
+    }
+
     /// Read this provider's API key from the environment.
+    ///
+    /// Grok returns an empty key when a Grok Build session exists.
     pub fn api_key_from_env(&self) -> Option<String> {
+        if *self == Self::Grok {
+            return Self::has_grok_session().then(String::new);
+        }
         non_empty_var(self.api_key_var())
     }
 
@@ -66,8 +92,15 @@ impl Provider {
 
     /// Message shown when no supported API key is set.
     pub fn missing_key_message() -> String {
-        let keys: Vec<&str> = Self::priority().iter().map(Self::api_key_var).collect();
-        format!("No API key found. Set {}", keys.join(", "))
+        let keys: Vec<&str> = Self::priority()
+            .iter()
+            .map(Self::api_key_var)
+            .filter(|key| !key.is_empty())
+            .collect();
+        format!(
+            "No API key found. Set {}. Or run `grok login` to use Grok Build.",
+            keys.join(", ")
+        )
     }
 
     /// Get the base URL for API requests.
@@ -94,7 +127,7 @@ impl Provider {
 
     /// Check if this provider uses an OpenAI-compatible chat completions API.
     pub fn is_openai_compatible(&self) -> bool {
-        matches!(self, Self::OpenAi | Self::DeepSeek | Self::Grok)
+        matches!(self, Self::OpenAi | Self::DeepSeek)
     }
 }
 
@@ -122,6 +155,21 @@ mod tests {
         std::env::remove_var("DEEPSEEK_MODEL");
         std::env::remove_var("GEMINI_MODEL");
         std::env::remove_var("XAI_MODEL");
+        hide_grok_session();
+    }
+
+    fn hide_grok_session() {
+        let dir = std::env::temp_dir().join("auto-commit-no-grok-session");
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::remove_file(dir.join("auth.json"));
+        std::env::set_var("GROK_HOME", &dir);
+    }
+
+    fn login_grok_session() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("auth.json"), b"{}\n").unwrap();
+        std::env::set_var("GROK_HOME", dir.path());
+        dir
     }
 
     #[test]
@@ -173,22 +221,35 @@ mod tests {
     #[serial]
     fn test_detect_grok() {
         clear_env_keys();
-        std::env::set_var("XAI_API_KEY", "xai-test");
+        let _session = login_grok_session();
 
         let result = Provider::detect();
         assert!(result.is_some());
         let (provider, key) = result.unwrap();
         assert_eq!(provider, Provider::Grok);
-        assert_eq!(key, "xai-test");
+        assert!(key.is_empty());
 
         clear_env_keys();
     }
 
     #[test]
     #[serial]
-    fn test_detect_grok_ignores_empty_key() {
+    fn test_detect_grok_ignores_empty_session() {
         clear_env_keys();
-        std::env::set_var("XAI_API_KEY", "");
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("auth.json"), b"").unwrap();
+        std::env::set_var("GROK_HOME", dir.path());
+
+        assert!(Provider::detect().is_none());
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
+    fn test_detect_xai_api_key_does_not_select_grok() {
+        clear_env_keys();
+        std::env::set_var("XAI_API_KEY", "xai-test");
 
         assert!(Provider::detect().is_none());
 
@@ -218,7 +279,7 @@ mod tests {
     fn test_detect_grok_is_lowest_priority() {
         clear_env_keys();
         std::env::set_var("GEMINI_API_KEY", "gemini-key");
-        std::env::set_var("XAI_API_KEY", "xai-key");
+        let _session = login_grok_session();
 
         let (provider, key) = Provider::detect().unwrap();
         assert_eq!(provider, Provider::Gemini);
@@ -278,14 +339,14 @@ mod tests {
     fn test_openai_compatible() {
         assert!(Provider::OpenAi.is_openai_compatible());
         assert!(Provider::DeepSeek.is_openai_compatible());
-        assert!(Provider::Grok.is_openai_compatible());
+        assert!(!Provider::Grok.is_openai_compatible());
         assert!(!Provider::Gemini.is_openai_compatible());
     }
 
     #[test]
     fn test_grok_name() {
-        assert_eq!(Provider::Grok.name(), "Grok");
-        assert_eq!(Provider::Grok.api_key_var(), "XAI_API_KEY");
+        assert_eq!(Provider::Grok.name(), "Grok Build");
+        assert!(Provider::Grok.api_key_var().is_empty());
         assert_eq!(Provider::Grok.model_var(), "XAI_MODEL");
     }
 }

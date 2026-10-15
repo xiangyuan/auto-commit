@@ -14,6 +14,10 @@ fn clear_env_keys() {
     std::env::remove_var("DEEPSEEK_API_KEY");
     std::env::remove_var("GEMINI_API_KEY");
     std::env::remove_var("XAI_API_KEY");
+    let dir = std::env::temp_dir().join("auto-commit-no-grok-session");
+    let _ = std::fs::create_dir_all(&dir);
+    let _ = std::fs::remove_file(dir.join("auth.json"));
+    std::env::set_var("GROK_HOME", &dir);
 }
 
 mod provider_detection {
@@ -59,10 +63,12 @@ mod provider_detection {
     #[serial]
     fn test_auto_detect_grok() {
         clear_env_keys();
-        std::env::set_var("XAI_API_KEY", "xai-test");
+        let home = tempfile::tempdir().unwrap();
+        std::fs::write(home.path().join("auth.json"), b"{}\n").unwrap();
+        std::env::set_var("GROK_HOME", home.path());
 
         let client = create_client().expect("Should create client");
-        assert_eq!(client.provider_name(), "Grok");
+        assert_eq!(client.provider_name(), "Grok Build");
 
         clear_env_keys();
     }
@@ -132,8 +138,8 @@ mod client_factory {
 
     #[test]
     fn test_create_grok_client() {
-        let client = create_client_for_provider(Provider::Grok, "test-key".into());
-        assert_eq!(client.provider_name(), "Grok");
+        let client = create_client_for_provider(Provider::Grok, String::new());
+        assert_eq!(client.provider_name(), "Grok Build");
     }
 }
 
@@ -173,7 +179,7 @@ mod provider_properties {
     fn test_openai_compatible_flag() {
         assert!(Provider::OpenAi.is_openai_compatible());
         assert!(Provider::DeepSeek.is_openai_compatible());
-        assert!(Provider::Grok.is_openai_compatible());
+        assert!(!Provider::Grok.is_openai_compatible());
         assert!(!Provider::Gemini.is_openai_compatible());
     }
 }

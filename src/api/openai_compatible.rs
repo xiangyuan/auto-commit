@@ -261,7 +261,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(client.provider_name(), "Grok");
+        assert_eq!(client.provider_name(), "Grok Build");
         assert_eq!(title, "feat: Add Grok provider");
         assert_eq!(desc, "Route commit generation through xAI");
     }
@@ -309,7 +309,7 @@ mod tests {
         assert_eq!(deepseek.provider_name(), "DeepSeek");
 
         let grok = OpenAiCompatibleClient::new(Provider::Grok, "key".into());
-        assert_eq!(grok.provider_name(), "Grok");
+        assert_eq!(grok.provider_name(), "Grok Build");
     }
 
     #[test]

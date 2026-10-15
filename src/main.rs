@@ -72,11 +72,8 @@ async fn main() -> Result<()> {
         format!("Generating commit message using {}...", provider_name),
     );
 
-    let client = create_client_with_model(
-        config.provider,
-        config.api_key.clone(),
-        Some(config.model.clone()),
-    );
+    let model_override = config.model_explicit.then(|| config.model.clone());
+    let client = create_client_with_model(config.provider, config.api_key.clone(), model_override);
     let (title, description) = client
         .generate_commit_message(
             &diff,
