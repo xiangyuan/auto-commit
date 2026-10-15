@@ -90,7 +90,7 @@ sudo mv target/release/auto-commit /usr/local/bin/
 
 お使いのLLMプロバイダーのAPIキーを環境変数に設定します。複数設定されている場合は、優先順位に従って自動選択されます。
 
-**優先順位**: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY` > `XAI_API_KEY`
+**優先順位**: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY`。どれも無いときは、ログイン済みの Grok Build を使います。他のキーがある場合は `--provider grok` が必要です。
 
 ```bash
 # OpenAI を使用
@@ -102,8 +102,10 @@ export DEEPSEEK_API_KEY='sk-...'
 # Google Gemini を使用
 export GEMINI_API_KEY='AIza...'
 
-# Grok (xAI) を使用
-export XAI_API_KEY='xai-...'
+# Grok Build（サブスクリプション）を使用
+# xAI の API キーは不要です。`grok login` 済みのセッションを使います。
+grok login
+auto-commit --provider grok
 ```
 
 または、プロジェクトルートに`.env`ファイルを作成：
@@ -113,8 +115,7 @@ export XAI_API_KEY='xai-...'
 OPENAI_API_KEY='sk-...'
 # DEEPSEEK_API_KEY='sk-...'
 # GEMINI_API_KEY='AIza...'
-# XAI_API_KEY='xai-...'
-# XAI_MODEL='grok-4.5'
+# XAI_MODEL='grok-4.5'  # 任意。--provider grok のときだけ CLI に渡す
 ```
 
 ### 動作確認
@@ -161,10 +162,10 @@ auto-commit --force
 # カスタムフォーマット指定
 auto-commit --format "{emoji} {prefix}: {title}"
 
-# プロバイダーを明示する（自動検出を上書き）
+# Grok Build のサブスクリプションを使う（要 `grok login`）
 auto-commit --provider grok
 
-# モデルを上書きする
+# モデルを上書きする。未指定なら Grok CLI の既定モデル
 auto-commit --provider grok --model grok-4.5
 
 # 詳細なログ出力
@@ -213,9 +214,9 @@ auto-commit --format "{title}"
 | OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` |
 | DeepSeek | `deepseek-chat` | `DEEPSEEK_API_KEY` |
 | Google Gemini | `gemini-2.0-flash` | `GEMINI_API_KEY` |
-| Grok (xAI) | `grok-4.7` | `XAI_API_KEY` |
+| Grok Build | CLI の既定（`--model` または `XAI_MODEL`） | `grok login` |
 
-デフォルトモデルは `--model`、または `OPENAI_MODEL` / `DEEPSEEK_MODEL` / `GEMINI_MODEL` / `XAI_MODEL` で上書きできます。`--model` が最優先です。
+デフォルトモデルは `--model`、または `OPENAI_MODEL` / `DEEPSEEK_MODEL` / `GEMINI_MODEL` / `XAI_MODEL` で上書きできます。`--model` が最優先です。Grok Build は `--model` か `XAI_MODEL` を指定したときだけモデルを CLI に渡します。`XAI_API_KEY` は読みません。
 
 ## 開発者向け情報
 
@@ -253,7 +254,8 @@ src/
 │   ├── mod.rs           # クライアントファクトリ
 │   ├── client.rs        # LlmClient trait
 │   ├── provider.rs      # Provider enum（自動検出）
-│   ├── openai_compatible.rs  # OpenAI/DeepSeek/Grok クライアント
+│   ├── openai_compatible.rs  # OpenAI/DeepSeek クライアント
+│   ├── grok_build.rs         # Grok Build（サブスクリプション）
 │   └── gemini.rs        # Gemini クライアント
 ├── cli/                 # CLIインターフェース
 ├── config/              # 設定管理
@@ -270,7 +272,9 @@ src/
 echo $OPENAI_API_KEY
 echo $DEEPSEEK_API_KEY
 echo $GEMINI_API_KEY
-echo $XAI_API_KEY
+
+# Grok Build は API キーではなくログイン状態を見ます
+grok login
 
 # .envファイルの確認
 cat .env

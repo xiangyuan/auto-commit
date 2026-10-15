@@ -74,7 +74,7 @@ sudo mv target/release/auto-commit /usr/local/bin/
 
 کلید API ارائه‌دهنده LLM خود را به عنوان متغیر محیطی تنظیم کنید. اگر چندین کلید تنظیم شده باشد، به صورت خودکار بر اساس اولویت انتخاب می‌شوند.
 
-**اولویت**: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY` > `XAI_API_KEY`
+**اولویت**: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY`. اگر هیچ‌کدام نباشد، نشست واردشدهٔ Grok Build استفاده می‌شود. اگر کلید دیگری باشد، `--provider grok` لازم است.
 
 ```bash
 # استفاده از OpenAI
@@ -86,8 +86,10 @@ export DEEPSEEK_API_KEY='sk-...'
 # استفاده از Google Gemini
 export GEMINI_API_KEY='AIza...'
 
-# استفاده از Grok (xAI)
-export XAI_API_KEY='xai-...'
+# استفاده از Grok Build (اشتراک)
+# کلید xAI API لازم نیست. پس از `grok login` درخواست‌ها از اشتراک می‌روند.
+grok login
+auto-commit --provider grok
 ```
 
 یا یک فایل `.env` در ریشه پروژه خود ایجاد کنید:
@@ -96,8 +98,7 @@ export XAI_API_KEY='xai-...'
 OPENAI_API_KEY='sk-...'
 # DEEPSEEK_API_KEY='sk-...'
 # GEMINI_API_KEY='AIza...'
-# XAI_API_KEY='xai-...'
-# XAI_MODEL='grok-4.5'
+# XAI_MODEL='grok-4.5'  # اختیاری؛ فقط با --provider grok به CLI داده می‌شود
 ```
 
 ## استفاده
@@ -134,10 +135,10 @@ auto-commit --force
 # فرمت سفارشی
 auto-commit --format "{emoji} {prefix}: {title}"
 
-# انتخاب صریح ارائه‌دهنده
+# اشتراک Grok Build (نیاز به `grok login`)
 auto-commit --provider grok
 
-# تغییر مدل
+# تغییر مدل. بدون این گزینه، مدل پیش‌فرض Grok CLI می‌ماند
 auto-commit --provider grok --model grok-4.5
 
 # ثبت جزئیات
@@ -161,9 +162,9 @@ auto-commit -v
 | OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` |
 | DeepSeek | `deepseek-chat` | `DEEPSEEK_API_KEY` |
 | Google Gemini | `gemini-2.0-flash` | `GEMINI_API_KEY` |
-| Grok (xAI) | `grok-4.7` | `XAI_API_KEY` |
+| Grok Build | پیش‌فرض CLI (`--model` یا `XAI_MODEL`) | `grok login` |
 
-مدل پیش‌فرض را می‌توان با `--model` یا `OPENAI_MODEL`، `DEEPSEEK_MODEL`، `GEMINI_MODEL`، `XAI_MODEL` عوض کرد. `--model` اولویت دارد.
+مدل پیش‌فرض را می‌توان با `--model` یا `OPENAI_MODEL`، `DEEPSEEK_MODEL`، `GEMINI_MODEL`، `XAI_MODEL` عوض کرد. `--model` اولویت دارد. Grok Build فقط وقتی `--model` یا `XAI_MODEL` تنظیم شده باشد مدل را به CLI می‌دهد. `XAI_API_KEY` خوانده نمی‌شود.
 
 ## مجوز
 

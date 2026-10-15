@@ -74,7 +74,7 @@ sudo mv target/release/auto-commit /usr/local/bin/
 
 Установите API-ключ вашего LLM-провайдера как переменную окружения. Если установлено несколько ключей, они автоматически выбираются по приоритету.
 
-**Приоритет**: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY` > `XAI_API_KEY`
+**Приоритет**: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY`. Если ни одного ключа нет, используется вошедший сеанс Grok Build. Если другой ключ задан, нужен `--provider grok`.
 
 ```bash
 # Использовать OpenAI
@@ -86,8 +86,10 @@ export DEEPSEEK_API_KEY='sk-...'
 # Использовать Google Gemini
 export GEMINI_API_KEY='AIza...'
 
-# Использовать Grok (xAI)
-export XAI_API_KEY='xai-...'
+# Использовать Grok Build (подписка)
+# Ключ xAI API не нужен. После `grok login` запросы идут по подписке.
+grok login
+auto-commit --provider grok
 ```
 
 Или создайте файл `.env` в корне проекта:
@@ -96,8 +98,7 @@ export XAI_API_KEY='xai-...'
 OPENAI_API_KEY='sk-...'
 # DEEPSEEK_API_KEY='sk-...'
 # GEMINI_API_KEY='AIza...'
-# XAI_API_KEY='xai-...'
-# XAI_MODEL='grok-4.5'
+# XAI_MODEL='grok-4.5'  # необязательно; передаётся только с --provider grok
 ```
 
 ## Использование
@@ -134,10 +135,10 @@ auto-commit --force
 # Пользовательский формат
 auto-commit --format "{emoji} {prefix}: {title}"
 
-# Явно выбрать провайдера
+# Подписка Grok Build (нужен `grok login`)
 auto-commit --provider grok
 
-# Переопределить модель
+# Переопределить модель. Без флага остаётся модель по умолчанию CLI Grok
 auto-commit --provider grok --model grok-4.5
 
 # Подробное логирование
@@ -161,9 +162,9 @@ auto-commit -v
 | OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` |
 | DeepSeek | `deepseek-chat` | `DEEPSEEK_API_KEY` |
 | Google Gemini | `gemini-2.0-flash` | `GEMINI_API_KEY` |
-| Grok (xAI) | `grok-4.7` | `XAI_API_KEY` |
+| Grok Build | модель CLI (`--model` или `XAI_MODEL`) | `grok login` |
 
-Модель по умолчанию можно переопределить флагом `--model` или переменными `OPENAI_MODEL`, `DEEPSEEK_MODEL`, `GEMINI_MODEL`, `XAI_MODEL`. `--model` имеет приоритет.
+Модель по умолчанию можно переопределить флагом `--model` или переменными `OPENAI_MODEL`, `DEEPSEEK_MODEL`, `GEMINI_MODEL`, `XAI_MODEL`. `--model` имеет приоритет. Grok Build передаёт модель в CLI только если заданы `--model` или `XAI_MODEL`. `XAI_API_KEY` не читается.
 
 ## Лицензия
 

@@ -74,7 +74,7 @@ sudo mv target/release/auto-commit /usr/local/bin/
 
 将 LLM 提供商的 API 密钥设置为环境变量。如果设置了多个密钥，将按优先级自动选择。
 
-**优先级**：`OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY` > `XAI_API_KEY`
+**优先级**：`OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY`。都没有时，使用已登录的 Grok Build。如果设了其他密钥，需要加上 `--provider grok`。
 
 ```bash
 # 使用 OpenAI
@@ -86,8 +86,10 @@ export DEEPSEEK_API_KEY='sk-...'
 # 使用 Google Gemini
 export GEMINI_API_KEY='AIza...'
 
-# 使用 Grok (xAI)
-export XAI_API_KEY='xai-...'
+# 使用 Grok Build（订阅）
+# 不需要 xAI API key。`grok login` 之后走已有订阅。
+grok login
+auto-commit --provider grok
 ```
 
 或在项目根目录创建 `.env` 文件：
@@ -96,8 +98,7 @@ export XAI_API_KEY='xai-...'
 OPENAI_API_KEY='sk-...'
 # DEEPSEEK_API_KEY='sk-...'
 # GEMINI_API_KEY='AIza...'
-# XAI_API_KEY='xai-...'
-# XAI_MODEL='grok-4.5'
+# XAI_MODEL='grok-4.5'  # 可选，只在 --provider grok 时传给 CLI
 ```
 
 ## 使用方法
@@ -134,10 +135,10 @@ auto-commit --force
 # 自定义格式
 auto-commit --format "{emoji} {prefix}: {title}"
 
-# 显式指定提供商
+# 使用 Grok Build 订阅（需要先 `grok login`）
 auto-commit --provider grok
 
-# 覆盖模型
+# 覆盖模型。不写则用 Grok CLI 自己的默认模型
 auto-commit --provider grok --model grok-4.5
 
 # 详细日志输出
@@ -161,9 +162,9 @@ auto-commit -v
 | OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` |
 | DeepSeek | `deepseek-chat` | `DEEPSEEK_API_KEY` |
 | Google Gemini | `gemini-2.0-flash` | `GEMINI_API_KEY` |
-| Grok (xAI) | `grok-4.7` | `XAI_API_KEY` |
+| Grok Build | CLI 默认（`--model` 或 `XAI_MODEL`） | `grok login` |
 
-默认模型可用 `--model`，或 `OPENAI_MODEL`、`DEEPSEEK_MODEL`、`GEMINI_MODEL`、`XAI_MODEL` 覆盖。`--model` 优先。
+默认模型可用 `--model`，或 `OPENAI_MODEL`、`DEEPSEEK_MODEL`、`GEMINI_MODEL`、`XAI_MODEL` 覆盖。`--model` 优先。Grok Build 只有在设置了 `--model` 或 `XAI_MODEL` 时才把模型传给 CLI。不读取 `XAI_API_KEY`。
 
 ## 许可证
 

@@ -74,7 +74,7 @@ sudo mv target/release/auto-commit /usr/local/bin/
 
 Set the API key for your LLM provider as an environment variable. If multiple keys are set, they are automatically selected by priority.
 
-**Priority**: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY` > `XAI_API_KEY`
+**Priority**: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY`. If none is set, a signed-in Grok Build session is used. If another key is set, pass `--provider grok`.
 
 ```bash
 # Use OpenAI
@@ -86,8 +86,10 @@ export DEEPSEEK_API_KEY='sk-...'
 # Use Google Gemini
 export GEMINI_API_KEY='AIza...'
 
-# Use Grok (xAI)
-export XAI_API_KEY='xai-...'
+# Use Grok Build (subscription)
+# No xAI API key. Sign in once; requests use the Grok Build subscription.
+grok login
+auto-commit --provider grok
 ```
 
 Or create a `.env` file in your project root:
@@ -96,8 +98,7 @@ Or create a `.env` file in your project root:
 OPENAI_API_KEY='sk-...'
 # DEEPSEEK_API_KEY='sk-...'
 # GEMINI_API_KEY='AIza...'
-# XAI_API_KEY='xai-...'
-# XAI_MODEL='grok-4.5'
+# XAI_MODEL='grok-4.5'  # optional; sent only with --provider grok
 ```
 
 ## Usage
@@ -134,10 +135,10 @@ auto-commit --force
 # Custom format
 auto-commit --format "{emoji} {prefix}: {title}"
 
-# Choose the provider explicitly
+# Use the Grok Build subscription (`grok login` required)
 auto-commit --provider grok
 
-# Override the model
+# Override the model. Omit this to keep the Grok CLI default
 auto-commit --provider grok --model grok-4.5
 
 # Verbose logging
@@ -161,9 +162,9 @@ auto-commit -v
 | OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` |
 | DeepSeek | `deepseek-chat` | `DEEPSEEK_API_KEY` |
 | Google Gemini | `gemini-2.0-flash` | `GEMINI_API_KEY` |
-| Grok (xAI) | `grok-4.7` | `XAI_API_KEY` |
+| Grok Build | CLI default (`--model` or `XAI_MODEL`) | `grok login` |
 
-Override a default model with `--model`, or with `OPENAI_MODEL`, `DEEPSEEK_MODEL`, `GEMINI_MODEL`, or `XAI_MODEL`. `--model` wins.
+Override a default model with `--model`, or with `OPENAI_MODEL`, `DEEPSEEK_MODEL`, `GEMINI_MODEL`, or `XAI_MODEL`. `--model` wins. Grok Build sends a model only when `--model` or `XAI_MODEL` is set. `XAI_API_KEY` is not read.
 
 ## License
 

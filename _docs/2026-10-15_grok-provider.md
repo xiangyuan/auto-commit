@@ -1,5 +1,7 @@
 # 2026-10-15 Grok provider
 
+> 此后 Grok 改为走 Grok Build 订阅，不再使用 `XAI_API_KEY`。见 [2026-10-15_grok-build-subscription.md](2026-10-15_grok-build-subscription.md)。下面是当时的 API key 实现记录。
+
 ## 做了什么
 
 自动提交接入 Grok。Grok 走现有的 OpenAI 兼容客户端，请求 `https://api.x.ai/v1/chat/completions`。
