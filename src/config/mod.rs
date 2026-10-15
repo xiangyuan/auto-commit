@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::{fs, path::Path};
 
 use crate::api::Provider;
@@ -10,6 +11,8 @@ const DEFAULT_GITMESSAGE_TEMPLATE: &str = include_str!("../../docs/.gitmessage")
 pub struct Config {
     pub provider: Provider,
     pub api_key: String,
+    /// Resolved model id. CLI `--model` wins over the provider model env var and the built-in default.
+    pub model: String,
     pub gitmessage_template: String,
 }
 
@@ -98,75 +101,109 @@ fn is_emoji_char(c: char) -> bool {
 }
 
 impl Config {
-    /// Load config from environment variables
-    /// Detects provider automatically based on which API key is set
-    /// Priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > GEMINI_API_KEY
+    /// Load config from environment variables.
+    ///
+    /// Detects the provider from which API key is set.
+    /// Priority: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY` > `XAI_API_KEY`.
     pub fn from_env() -> Result<Self> {
-        let (provider, api_key) = Provider::detect()
-            .context("No API key found. Set OPENAI_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY")?;
-
-        let gitmessage_template = load_gitmessage_template();
-
-        Ok(Self {
-            provider,
-            api_key,
-            gitmessage_template,
-        })
+        Self::from_env_for(None)
     }
 
-    /// Load config from .env file
-    /// Supports multiple API keys with same priority as from_env()
+    /// Load config from the environment for one provider, or auto-detect when `explicit` is `None`.
+    pub fn from_env_for(explicit: Option<Provider>) -> Result<Self> {
+        let (provider, api_key) =
+            select_provider(explicit, |provider| provider.api_key_from_env())?;
+        Ok(Self::assemble(provider, api_key, None))
+    }
+
+    /// Load config from a `.env` file.
+    ///
+    /// Supports multiple API keys with the same priority as [`Self::from_env`].
     pub fn from_env_file(path: &Path) -> Result<Self> {
+        Self::from_env_file_for(path, None)
+    }
+
+    /// Load config from a `.env` file, optionally forcing one provider.
+    pub fn from_env_file_for(path: &Path, explicit: Option<Provider>) -> Result<Self> {
         let content = fs::read_to_string(path).context("Failed to read .env file")?;
+        let values = parse_env_assignments(&content);
+        let (provider, api_key) = select_provider(explicit, |provider| {
+            values
+                .get(provider.api_key_var())
+                .cloned()
+                .filter(|key| !key.is_empty())
+        })?;
+        let file_model = values
+            .get(provider.model_var())
+            .cloned()
+            .filter(|model| !model.is_empty());
+        Ok(Self::assemble(provider, api_key, file_model))
+    }
 
-        let mut openai_key = None;
-        let mut deepseek_key = None;
-        let mut gemini_key = None;
-
-        for line in content.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-
-            // Handle both regular and export prefixed
-            let line = line.strip_prefix("export ").unwrap_or(line);
-
-            if let Some(value) = extract_env_value(line, "OPENAI_API_KEY=") {
-                openai_key = Some(value);
-            } else if let Some(value) = extract_env_value(line, "DEEPSEEK_API_KEY=") {
-                deepseek_key = Some(value);
-            } else if let Some(value) = extract_env_value(line, "GEMINI_API_KEY=") {
-                gemini_key = Some(value);
-            }
+    /// Replace the resolved model id. An empty string leaves the current model in place.
+    pub fn with_model(mut self, model: impl Into<String>) -> Self {
+        let model = model.into();
+        if !model.is_empty() {
+            self.model = model;
         }
+        self
+    }
 
-        // Priority: OpenAI > DeepSeek > Gemini
-        let (provider, api_key) = if let Some(key) = openai_key {
-            (Provider::OpenAi, key)
-        } else if let Some(key) = deepseek_key {
-            (Provider::DeepSeek, key)
-        } else if let Some(key) = gemini_key {
-            (Provider::Gemini, key)
-        } else {
-            anyhow::bail!(
-                "No API key found in .env file. Set OPENAI_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY"
-            );
-        };
-
-        let gitmessage_template = load_gitmessage_template();
-
-        Ok(Self {
+    fn assemble(provider: Provider, api_key: String, file_model: Option<String>) -> Self {
+        let model = file_model.unwrap_or_else(|| provider.resolve_model());
+        Self {
             provider,
             api_key,
-            gitmessage_template,
-        })
+            model,
+            gitmessage_template: load_gitmessage_template(),
+        }
     }
 }
 
-fn extract_env_value(line: &str, prefix: &str) -> Option<String> {
-    line.strip_prefix(prefix)
-        .map(|v| v.trim_matches('\'').trim_matches('"').to_string())
+fn select_provider(
+    explicit: Option<Provider>,
+    mut lookup: impl FnMut(Provider) -> Option<String>,
+) -> Result<(Provider, String)> {
+    if let Some(provider) = explicit {
+        let key = lookup(provider).with_context(|| {
+            format!(
+                "No API key found for {}. Set {}",
+                provider.name(),
+                provider.api_key_var()
+            )
+        })?;
+        return Ok((provider, key));
+    }
+
+    for provider in Provider::priority() {
+        if let Some(key) = lookup(provider) {
+            return Ok((provider, key));
+        }
+    }
+
+    anyhow::bail!(Provider::missing_key_message())
+}
+
+fn parse_env_assignments(content: &str) -> HashMap<String, String> {
+    let mut values = HashMap::new();
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let line = line.strip_prefix("export ").unwrap_or(line);
+        let Some((key, raw_value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = raw_value
+            .trim()
+            .trim_matches('\'')
+            .trim_matches('"')
+            .to_string();
+        values.insert(key.trim().to_string(), value);
+    }
+    values
 }
 
 #[cfg(test)]

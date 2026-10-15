@@ -28,7 +28,7 @@ struct Choice {
     message: ChatMessage,
 }
 
-/// Client for OpenAI-compatible APIs (OpenAI, DeepSeek)
+/// Client for OpenAI-compatible APIs (OpenAI, DeepSeek, Grok)
 #[derive(Debug, Clone)]
 pub struct OpenAiCompatibleClient {
     api_key: String,
@@ -132,11 +132,7 @@ impl LlmClient for OpenAiCompatibleClient {
     }
 
     fn provider_name(&self) -> &str {
-        match self.provider {
-            Provider::OpenAi => "OpenAI",
-            Provider::DeepSeek => "DeepSeek",
-            _ => "Unknown",
-        }
+        self.provider.name()
     }
 }
 

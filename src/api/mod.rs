@@ -10,23 +10,37 @@ pub use provider::Provider;
 
 use anyhow::{Context, Result};
 
-/// Create an LLM client based on available API keys
+/// Create an LLM client based on available API keys.
 ///
-/// Priority order: OPENAI_API_KEY > DEEPSEEK_API_KEY > GEMINI_API_KEY
+/// Priority order: `OPENAI_API_KEY` > `DEEPSEEK_API_KEY` > `GEMINI_API_KEY` > `XAI_API_KEY`.
 pub fn create_client() -> Result<Box<dyn LlmClient>> {
-    let (provider, api_key) = Provider::detect()
-        .context("No API key found. Set OPENAI_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY")?;
+    let (provider, api_key) = Provider::detect().context(Provider::missing_key_message())?;
 
-    Ok(create_client_for_provider(provider, api_key))
+    Ok(create_client_with_model(provider, api_key, None))
 }
 
-/// Create a client for a specific provider
+/// Create a client for a specific provider, using its resolved model id.
 pub fn create_client_for_provider(provider: Provider, api_key: String) -> Box<dyn LlmClient> {
+    create_client_with_model(provider, api_key, None)
+}
+
+/// Create a client, optionally overriding the resolved model id.
+///
+/// An empty override is ignored. `None` uses the provider model env var, then the built-in default.
+pub fn create_client_with_model(
+    provider: Provider,
+    api_key: String,
+    model: Option<String>,
+) -> Box<dyn LlmClient> {
+    let model = model
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| provider.resolve_model());
+
     match provider {
         Provider::OpenAi | Provider::DeepSeek | Provider::Grok => {
-            Box::new(OpenAiCompatibleClient::new(provider, api_key))
+            Box::new(OpenAiCompatibleClient::new(provider, api_key).with_model(model))
         }
-        Provider::Gemini => Box::new(GeminiClient::new(api_key)),
+        Provider::Gemini => Box::new(GeminiClient::new(api_key).with_model(model)),
     }
 }
 
