@@ -42,6 +42,7 @@ impl Cli {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::Provider;
 
     #[test]
     fn test_parse_dry_run() {
@@ -51,6 +52,33 @@ mod tests {
         assert!(!cli.review);
         assert!(!cli.force);
         assert!(cli.format.is_none());
+        assert!(cli.provider.is_none());
+        assert!(cli.model.is_none());
+    }
+
+    #[test]
+    fn test_parse_provider_and_model() {
+        let cases = [
+            ("openai", Provider::OpenAi),
+            ("open-ai", Provider::OpenAi),
+            ("deepseek", Provider::DeepSeek),
+            ("deep-seek", Provider::DeepSeek),
+            ("gemini", Provider::Gemini),
+            ("grok", Provider::Grok),
+            ("xai", Provider::Grok),
+        ];
+
+        for (name, expected) in cases {
+            let cli = Cli::parse_from(["auto-commit", "--provider", name, "--model", "custom-model"]);
+            assert_eq!(cli.provider, Some(expected), "{name}");
+            assert_eq!(cli.model.as_deref(), Some("custom-model"));
+        }
+    }
+
+    #[test]
+    fn test_parse_unknown_provider() {
+        let result = Cli::try_parse_from(["auto-commit", "--provider", "claude"]);
+        assert!(result.is_err());
     }
 
     #[test]
