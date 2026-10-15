@@ -165,11 +165,14 @@ mod tests {
             .create_async()
             .await;
 
-        let client =
-            OpenAiCompatibleClient::with_base_url(Provider::OpenAi, "test-key".into(), server.url());
+        let client = OpenAiCompatibleClient::with_base_url(
+            Provider::OpenAi,
+            "test-key".into(),
+            server.url(),
+        );
 
         let (title, desc) = client
-            .generate_commit_message("diff --git", None)
+            .generate_commit_message("diff --git", None, None, None)
             .await
             .unwrap();
 
@@ -204,7 +207,7 @@ mod tests {
         );
 
         let (title, desc) = client
-            .generate_commit_message("diff --git", None)
+            .generate_commit_message("diff --git", None, None, None)
             .await
             .unwrap();
 
@@ -225,7 +228,9 @@ mod tests {
         let client =
             OpenAiCompatibleClient::with_base_url(Provider::OpenAi, "bad-key".into(), server.url());
 
-        let result = client.generate_commit_message("diff", None).await;
+        let result = client
+            .generate_commit_message("diff", None, None, None)
+            .await;
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("401") || err.contains("API"));
@@ -242,8 +247,8 @@ mod tests {
 
     #[test]
     fn test_with_model() {
-        let client = OpenAiCompatibleClient::new(Provider::OpenAi, "key".into())
-            .with_model("gpt-4-turbo");
+        let client =
+            OpenAiCompatibleClient::new(Provider::OpenAi, "key".into()).with_model("gpt-4-turbo");
         assert_eq!(client.model, "gpt-4-turbo");
     }
 }

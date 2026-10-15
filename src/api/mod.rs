@@ -14,8 +14,8 @@ use anyhow::{Context, Result};
 ///
 /// Priority order: OPENAI_API_KEY > DEEPSEEK_API_KEY > GEMINI_API_KEY
 pub fn create_client() -> Result<Box<dyn LlmClient>> {
-    let (provider, api_key) =
-        Provider::detect().context("No API key found. Set OPENAI_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY")?;
+    let (provider, api_key) = Provider::detect()
+        .context("No API key found. Set OPENAI_API_KEY, DEEPSEEK_API_KEY, or GEMINI_API_KEY")?;
 
     Ok(create_client_for_provider(provider, api_key))
 }
@@ -23,7 +23,7 @@ pub fn create_client() -> Result<Box<dyn LlmClient>> {
 /// Create a client for a specific provider
 pub fn create_client_for_provider(provider: Provider, api_key: String) -> Box<dyn LlmClient> {
     match provider {
-        Provider::OpenAi | Provider::DeepSeek => {
+        Provider::OpenAi | Provider::DeepSeek | Provider::Grok => {
             Box::new(OpenAiCompatibleClient::new(provider, api_key))
         }
         Provider::Gemini => Box::new(GeminiClient::new(api_key)),
@@ -34,13 +34,22 @@ pub fn create_client_for_provider(provider: Provider, api_key: String) -> Box<dy
 pub use client::{build_prompt, parse_commit_message};
 
 // Legacy types for backward compatibility (deprecated)
-#[deprecated(since = "2.0.0", note = "Use OpenAiCompatibleClient or GeminiClient instead")]
+#[deprecated(
+    since = "2.0.0",
+    note = "Use OpenAiCompatibleClient or GeminiClient instead"
+)]
 pub type DeepSeekClient = OpenAiCompatibleClient;
 
-#[deprecated(since = "2.0.0", note = "Use OpenAiCompatibleClient or GeminiClient instead")]
+#[deprecated(
+    since = "2.0.0",
+    note = "Use OpenAiCompatibleClient or GeminiClient instead"
+)]
 pub type DeepSeekRequest = ();
 
-#[deprecated(since = "2.0.0", note = "Use OpenAiCompatibleClient or GeminiClient instead")]
+#[deprecated(
+    since = "2.0.0",
+    note = "Use OpenAiCompatibleClient or GeminiClient instead"
+)]
 pub type DeepSeekResponse = ();
 
 #[cfg(test)]

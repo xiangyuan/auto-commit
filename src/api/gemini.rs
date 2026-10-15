@@ -176,7 +176,10 @@ mod tests {
     async fn test_gemini_generate_commit_message() {
         let mut server = Server::new_async().await;
         let _m = server
-            .mock("POST", mockito::Matcher::Regex(r"/v1beta/models/.*:generateContent.*".to_string()))
+            .mock(
+                "POST",
+                mockito::Matcher::Regex(r"/v1beta/models/.*:generateContent.*".to_string()),
+            )
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(
@@ -196,7 +199,7 @@ mod tests {
         let client = GeminiClient::with_base_url("test-key".into(), server.url());
 
         let (title, desc) = client
-            .generate_commit_message("diff --git", None)
+            .generate_commit_message("diff --git", None, None, None)
             .await
             .unwrap();
 
@@ -208,7 +211,10 @@ mod tests {
     async fn test_gemini_api_error() {
         let mut server = Server::new_async().await;
         let _m = server
-            .mock("POST", mockito::Matcher::Regex(r"/v1beta/models/.*:generateContent.*".to_string()))
+            .mock(
+                "POST",
+                mockito::Matcher::Regex(r"/v1beta/models/.*:generateContent.*".to_string()),
+            )
             .with_status(400)
             .with_body(r#"{"error": {"message": "Invalid API key"}}"#)
             .create_async()
@@ -216,7 +222,9 @@ mod tests {
 
         let client = GeminiClient::with_base_url("bad-key".into(), server.url());
 
-        let result = client.generate_commit_message("diff", None).await;
+        let result = client
+            .generate_commit_message("diff", None, None, None)
+            .await;
         assert!(result.is_err());
     }
 

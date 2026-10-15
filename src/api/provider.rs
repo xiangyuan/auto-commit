@@ -1,66 +1,110 @@
 use std::fmt;
 
-/// Supported LLM providers
+/// Supported LLM providers.
+///
+/// Automatic detection follows [`Provider::priority`]: OpenAI, DeepSeek, Gemini, then Grok.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Provider {
     OpenAi,
     DeepSeek,
     Gemini,
+    Grok,
 }
 
 impl Provider {
-    /// Detect provider from environment variables (priority order)
-    pub fn detect() -> Option<(Self, String)> {
-        // Priority: OPENAI_API_KEY > DEEPSEEK_API_KEY > GEMINI_API_KEY
-        if let Ok(key) = std::env::var("OPENAI_API_KEY") {
-            if !key.is_empty() {
-                return Some((Self::OpenAi, key));
-            }
-        }
-        if let Ok(key) = std::env::var("DEEPSEEK_API_KEY") {
-            if !key.is_empty() {
-                return Some((Self::DeepSeek, key));
-            }
-        }
-        if let Ok(key) = std::env::var("GEMINI_API_KEY") {
-            if !key.is_empty() {
-                return Some((Self::Gemini, key));
-            }
-        }
-        None
+    /// Detection order. The first provider with a non-empty API key wins.
+    pub fn priority() -> [Self; 4] {
+        [Self::OpenAi, Self::DeepSeek, Self::Gemini, Self::Grok]
     }
 
-    /// Get the base URL for API requests
+    /// Detect provider from environment variables (priority order).
+    pub fn detect() -> Option<(Self, String)> {
+        Self::priority()
+            .into_iter()
+            .find_map(|provider| provider.api_key_from_env().map(|key| (provider, key)))
+    }
+
+    /// Environment variable that holds this provider's API key.
+    pub fn api_key_var(&self) -> &'static str {
+        match self {
+            Self::OpenAi => "OPENAI_API_KEY",
+            Self::DeepSeek => "DEEPSEEK_API_KEY",
+            Self::Gemini => "GEMINI_API_KEY",
+            Self::Grok => "XAI_API_KEY",
+        }
+    }
+
+    /// Environment variable that overrides this provider's model id.
+    pub fn model_var(&self) -> &'static str {
+        match self {
+            Self::OpenAi => "OPENAI_MODEL",
+            Self::DeepSeek => "DEEPSEEK_MODEL",
+            Self::Gemini => "GEMINI_MODEL",
+            Self::Grok => "XAI_MODEL",
+        }
+    }
+
+    /// Display name used in logs and the spinner.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::OpenAi => "OpenAI",
+            Self::DeepSeek => "DeepSeek",
+            Self::Gemini => "Gemini",
+            Self::Grok => "Grok",
+        }
+    }
+
+    /// Read this provider's API key from the environment.
+    pub fn api_key_from_env(&self) -> Option<String> {
+        non_empty_var(self.api_key_var())
+    }
+
+    /// Model id from the provider model env var, otherwise [`Self::default_model`].
+    pub fn resolve_model(&self) -> String {
+        non_empty_var(self.model_var()).unwrap_or_else(|| self.default_model().to_string())
+    }
+
+    /// Message shown when no supported API key is set.
+    pub fn missing_key_message() -> String {
+        let keys: Vec<&str> = Self::priority().iter().map(Self::api_key_var).collect();
+        format!("No API key found. Set {}", keys.join(", "))
+    }
+
+    /// Get the base URL for API requests.
+    ///
+    /// OpenAI-compatible clients append `/v1/chat/completions`.
     pub fn base_url(&self) -> &'static str {
         match self {
             Self::OpenAi => "https://api.openai.com",
             Self::DeepSeek => "https://api.deepseek.com",
             Self::Gemini => "https://generativelanguage.googleapis.com",
+            Self::Grok => "https://api.x.ai",
         }
     }
 
-    /// Get the default model for this provider
+    /// Built-in model id used when no model override is set.
     pub fn default_model(&self) -> &'static str {
         match self {
             Self::OpenAi => "gpt-4o-mini",
             Self::DeepSeek => "deepseek-chat",
             Self::Gemini => "gemini-2.0-flash",
+            Self::Grok => "grok-4.7",
         }
     }
 
-    /// Check if this provider uses OpenAI-compatible API
+    /// Check if this provider uses an OpenAI-compatible chat completions API.
     pub fn is_openai_compatible(&self) -> bool {
-        matches!(self, Self::OpenAi | Self::DeepSeek)
+        matches!(self, Self::OpenAi | Self::DeepSeek | Self::Grok)
     }
+}
+
+fn non_empty_var(name: &str) -> Option<String> {
+    std::env::var(name).ok().filter(|value| !value.is_empty())
 }
 
 impl fmt::Display for Provider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::OpenAi => write!(f, "OpenAI"),
-            Self::DeepSeek => write!(f, "DeepSeek"),
-            Self::Gemini => write!(f, "Gemini"),
-        }
+        f.write_str(self.name())
     }
 }
 
@@ -222,7 +266,10 @@ mod tests {
         clear_env_keys();
         std::env::set_var("XAI_MODEL", "");
 
-        assert_eq!(Provider::Grok.resolve_model(), Provider::Grok.default_model());
+        assert_eq!(
+            Provider::Grok.resolve_model(),
+            Provider::Grok.default_model()
+        );
 
         clear_env_keys();
     }

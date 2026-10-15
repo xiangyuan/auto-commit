@@ -197,7 +197,7 @@ mod api_response_format {
         );
 
         let (title, desc) = client
-            .generate_commit_message("diff content", None)
+            .generate_commit_message("diff content", None, None, None)
             .await
             .expect("Should parse response");
 
@@ -238,11 +238,10 @@ mod api_response_format {
             .create_async()
             .await;
 
-        let client =
-            auto_commit::api::GeminiClient::with_base_url("test-key".into(), server.url());
+        let client = auto_commit::api::GeminiClient::with_base_url("test-key".into(), server.url());
 
         let (title, desc) = client
-            .generate_commit_message("diff content", None)
+            .generate_commit_message("diff content", None, None, None)
             .await
             .expect("Should parse response");
 
@@ -261,7 +260,9 @@ mod error_handling {
         let _m = server
             .mock("POST", "/v1/chat/completions")
             .with_status(401)
-            .with_body(r#"{"error": {"message": "Invalid API key", "type": "invalid_request_error"}}"#)
+            .with_body(
+                r#"{"error": {"message": "Invalid API key", "type": "invalid_request_error"}}"#,
+            )
             .create_async()
             .await;
 
@@ -271,7 +272,9 @@ mod error_handling {
             server.url(),
         );
 
-        let result = client.generate_commit_message("diff", None).await;
+        let result = client
+            .generate_commit_message("diff", None, None, None)
+            .await;
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("401") || err.contains("API"));
@@ -290,10 +293,11 @@ mod error_handling {
             .create_async()
             .await;
 
-        let client =
-            auto_commit::api::GeminiClient::with_base_url("test-key".into(), server.url());
+        let client = auto_commit::api::GeminiClient::with_base_url("test-key".into(), server.url());
 
-        let result = client.generate_commit_message("diff", None).await;
+        let result = client
+            .generate_commit_message("diff", None, None, None)
+            .await;
         assert!(result.is_err());
     }
 }
