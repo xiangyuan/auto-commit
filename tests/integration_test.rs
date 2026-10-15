@@ -13,6 +13,7 @@ fn clear_env_keys() {
     std::env::remove_var("OPENAI_API_KEY");
     std::env::remove_var("DEEPSEEK_API_KEY");
     std::env::remove_var("GEMINI_API_KEY");
+    std::env::remove_var("XAI_API_KEY");
 }
 
 mod provider_detection {
@@ -56,12 +57,25 @@ mod provider_detection {
 
     #[test]
     #[serial]
+    fn test_auto_detect_grok() {
+        clear_env_keys();
+        std::env::set_var("XAI_API_KEY", "xai-test");
+
+        let client = create_client().expect("Should create client");
+        assert_eq!(client.provider_name(), "Grok");
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
     fn test_priority_order() {
         clear_env_keys();
         // Set all keys - OpenAI should have highest priority
         std::env::set_var("OPENAI_API_KEY", "openai");
         std::env::set_var("DEEPSEEK_API_KEY", "deepseek");
         std::env::set_var("GEMINI_API_KEY", "gemini");
+        std::env::set_var("XAI_API_KEY", "xai");
 
         let client = create_client().expect("Should create client");
         assert_eq!(client.provider_name(), "OpenAI");
@@ -115,6 +129,12 @@ mod client_factory {
         let client = create_client_for_provider(Provider::Gemini, "test-key".into());
         assert_eq!(client.provider_name(), "Gemini");
     }
+
+    #[test]
+    fn test_create_grok_client() {
+        let client = create_client_for_provider(Provider::Grok, "test-key".into());
+        assert_eq!(client.provider_name(), "Grok");
+    }
 }
 
 mod provider_properties {
@@ -136,17 +156,24 @@ mod provider_properties {
     }
 
     #[test]
+    fn test_grok_base_url() {
+        assert_eq!(Provider::Grok.base_url(), "https://api.x.ai");
+    }
+
+    #[test]
     fn test_default_models() {
         // These should be reasonable defaults
         assert!(Provider::OpenAi.default_model().contains("gpt"));
         assert!(Provider::DeepSeek.default_model().contains("deepseek"));
         assert!(Provider::Gemini.default_model().contains("gemini"));
+        assert_eq!(Provider::Grok.default_model(), "grok-4.7");
     }
 
     #[test]
     fn test_openai_compatible_flag() {
         assert!(Provider::OpenAi.is_openai_compatible());
         assert!(Provider::DeepSeek.is_openai_compatible());
+        assert!(Provider::Grok.is_openai_compatible());
         assert!(!Provider::Gemini.is_openai_compatible());
     }
 }

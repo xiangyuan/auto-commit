@@ -236,6 +236,74 @@ mod tests {
         assert!(err.contains("401") || err.contains("API"));
     }
 
+    #[tokio::test]
+    async fn test_grok_generate_commit_message() {
+        let mut server = Server::new_async().await;
+        let _m = server
+            .mock("POST", "/v1/chat/completions")
+            .match_body(mockito::Matcher::Regex("grok-4\\.7".into()))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": "feat: Add Grok provider\n\nRoute commit generation through xAI"
+                    }
+                }]
+            }"#,
+            )
+            .create_async()
+            .await;
+
+        let client =
+            OpenAiCompatibleClient::with_base_url(Provider::Grok, "test-key".into(), server.url());
+
+        let (title, desc) = client
+            .generate_commit_message("diff --git", None, None, None)
+            .await
+            .unwrap();
+
+        assert_eq!(client.provider_name(), "Grok");
+        assert_eq!(title, "feat: Add Grok provider");
+        assert_eq!(desc, "Route commit generation through xAI");
+    }
+
+    #[tokio::test]
+    async fn test_grok_model_override_is_sent() {
+        let mut server = Server::new_async().await;
+        let _m = server
+            .mock("POST", "/v1/chat/completions")
+            .match_body(mockito::Matcher::Regex("grok-4\\.5".into()))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": "fix: Use the requested model"
+                    }
+                }]
+            }"#,
+            )
+            .create_async()
+            .await;
+
+        let client =
+            OpenAiCompatibleClient::with_base_url(Provider::Grok, "test-key".into(), server.url())
+                .with_model("grok-4.5");
+
+        let (title, desc) = client
+            .generate_commit_message("diff --git", None, None, None)
+            .await
+            .unwrap();
+
+        assert_eq!(title, "fix: Use the requested model");
+        assert_eq!(desc, "");
+    }
+
     #[test]
     fn test_provider_name() {
         let openai = OpenAiCompatibleClient::new(Provider::OpenAi, "key".into());
@@ -243,6 +311,9 @@ mod tests {
 
         let deepseek = OpenAiCompatibleClient::new(Provider::DeepSeek, "key".into());
         assert_eq!(deepseek.provider_name(), "DeepSeek");
+
+        let grok = OpenAiCompatibleClient::new(Provider::Grok, "key".into());
+        assert_eq!(grok.provider_name(), "Grok");
     }
 
     #[test]

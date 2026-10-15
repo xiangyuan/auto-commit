@@ -40,7 +40,7 @@ pub fn load_gitmessage_template() -> String {
 /// Returns a formatted string with prefix -> emoji mappings
 pub fn parse_emoji_mappings(template: &str) -> String {
     let mut mappings = Vec::new();
-    
+
     for line in template.lines() {
         let line = line.trim();
         // Look for emoji mapping lines like: "#  🐛  :bug:           fix"
@@ -53,16 +53,16 @@ pub fn parse_emoji_mappings(template: &str) -> String {
             }
         }
     }
-    
+
     if mappings.is_empty() {
         return String::new();
     }
-    
+
     let mut result = String::from("根据以下 emoji 映射选择合适的类型：\n");
     for (prefix, emoji) in mappings {
         result.push_str(&format!("- {}: {}\n", prefix, emoji));
     }
-    
+
     result
 }
 
@@ -181,6 +181,11 @@ mod tests {
         env::remove_var("OPENAI_API_KEY");
         env::remove_var("DEEPSEEK_API_KEY");
         env::remove_var("GEMINI_API_KEY");
+        env::remove_var("XAI_API_KEY");
+        env::remove_var("OPENAI_MODEL");
+        env::remove_var("DEEPSEEK_MODEL");
+        env::remove_var("GEMINI_MODEL");
+        env::remove_var("XAI_MODEL");
     }
 
     #[test]
@@ -227,12 +232,86 @@ mod tests {
 
     #[test]
     #[serial]
+    fn test_config_from_env_grok() {
+        clear_env_keys();
+        env::set_var("XAI_API_KEY", "xai-test");
+
+        let config = Config::from_env().unwrap();
+
+        assert_eq!(config.provider, Provider::Grok);
+        assert_eq!(config.api_key, "xai-test");
+        assert_eq!(config.model, "grok-4.7");
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_model_from_env() {
+        clear_env_keys();
+        env::set_var("XAI_API_KEY", "xai-test");
+        env::set_var("XAI_MODEL", "grok-4.5");
+
+        let config = Config::from_env().unwrap();
+
+        assert_eq!(config.provider, Provider::Grok);
+        assert_eq!(config.model, "grok-4.5");
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_explicit_provider_ignores_higher_priority_key() {
+        clear_env_keys();
+        env::set_var("OPENAI_API_KEY", "openai");
+        env::set_var("XAI_API_KEY", "xai-test");
+
+        let config = Config::from_env_for(Some(Provider::Grok)).unwrap();
+
+        assert_eq!(config.provider, Provider::Grok);
+        assert_eq!(config.api_key, "xai-test");
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_explicit_provider_missing_key() {
+        clear_env_keys();
+        env::set_var("OPENAI_API_KEY", "openai");
+
+        let err = Config::from_env_for(Some(Provider::Grok))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("XAI_API_KEY"));
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_with_model_overrides_env() {
+        clear_env_keys();
+        env::set_var("XAI_API_KEY", "xai-test");
+        env::set_var("XAI_MODEL", "grok-4.5");
+
+        let config = Config::from_env().unwrap().with_model("grok-4.6");
+
+        assert_eq!(config.model, "grok-4.6");
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
     fn test_config_from_env_priority() {
         clear_env_keys();
         // Set all keys - OpenAI should win
         env::set_var("OPENAI_API_KEY", "openai");
         env::set_var("DEEPSEEK_API_KEY", "deepseek");
         env::set_var("GEMINI_API_KEY", "gemini");
+        env::set_var("XAI_API_KEY", "xai");
 
         let config = Config::from_env().unwrap();
 
@@ -250,6 +329,7 @@ mod tests {
         let result = Config::from_env();
 
         assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("XAI_API_KEY"));
     }
 
     #[test]
@@ -283,6 +363,31 @@ mod tests {
 
         assert_eq!(config.provider, Provider::Gemini);
         assert_eq!(config.api_key, "AIza-test");
+    }
+
+    #[test]
+    fn test_config_from_env_file_grok() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "XAI_API_KEY='xai-test'").unwrap();
+        writeln!(temp_file, "XAI_MODEL='grok-4.5'").unwrap();
+
+        let config = Config::from_env_file(temp_file.path()).unwrap();
+
+        assert_eq!(config.provider, Provider::Grok);
+        assert_eq!(config.api_key, "xai-test");
+        assert_eq!(config.model, "grok-4.5");
+    }
+
+    #[test]
+    fn test_config_from_env_file_explicit_grok() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "OPENAI_API_KEY='openai'").unwrap();
+        writeln!(temp_file, "XAI_API_KEY='xai-test'").unwrap();
+
+        let config = Config::from_env_file_for(temp_file.path(), Some(Provider::Grok)).unwrap();
+
+        assert_eq!(config.provider, Provider::Grok);
+        assert_eq!(config.api_key, "xai-test");
     }
 
     #[test]

@@ -61,6 +61,8 @@ mod tests {
         std::env::remove_var("OPENAI_API_KEY");
         std::env::remove_var("DEEPSEEK_API_KEY");
         std::env::remove_var("GEMINI_API_KEY");
+        std::env::remove_var("XAI_API_KEY");
+        std::env::remove_var("XAI_MODEL");
     }
 
     #[test]
@@ -101,11 +103,25 @@ mod tests {
 
     #[test]
     #[serial]
+    fn test_create_client_grok() {
+        clear_env_keys();
+        std::env::set_var("XAI_API_KEY", "xai-test");
+
+        let client = create_client().unwrap();
+        assert_eq!(client.provider_name(), "Grok");
+
+        clear_env_keys();
+    }
+
+    #[test]
+    #[serial]
     fn test_create_client_no_key() {
         clear_env_keys();
 
-        let result = create_client();
-        assert!(result.is_err());
+        match create_client() {
+            Ok(_) => panic!("expected missing API key error"),
+            Err(err) => assert!(err.to_string().contains("XAI_API_KEY")),
+        }
 
         clear_env_keys();
     }
@@ -120,5 +136,21 @@ mod tests {
 
         let gemini = create_client_for_provider(Provider::Gemini, "key".into());
         assert_eq!(gemini.provider_name(), "Gemini");
+
+        let grok = create_client_for_provider(Provider::Grok, "key".into());
+        assert_eq!(grok.provider_name(), "Grok");
+    }
+
+    #[test]
+    #[serial]
+    fn test_create_client_with_model_override() {
+        clear_env_keys();
+        std::env::set_var("XAI_MODEL", "grok-4.7");
+
+        let client =
+            create_client_with_model(Provider::Grok, "key".into(), Some("grok-4.5".into()));
+        assert_eq!(client.provider_name(), "Grok");
+
+        clear_env_keys();
     }
 }
